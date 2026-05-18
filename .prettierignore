@@ -7,3 +7,6 @@ coverage/
 pnpm-lock.yaml
 src-tauri/target/
 examples/starter-vault/
+# Test fixtures are byte-exact golden files — Prettier would corrupt the
+# round-trip contract they encode.
+packages/core/test/fixtures/

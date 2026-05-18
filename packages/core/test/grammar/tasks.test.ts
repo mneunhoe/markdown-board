@@ -1,6 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parseTasks, toMarkdown } from '../../src/grammar/tasks.js';
 import type { Task, Vault } from '../../src/grammar/types.js';
+
+const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
 
 // Canonical §15.1 example: one section, one fully-tokenised task with an
 // existing id. Covers H2 → section slug, bold-title extraction, all four
@@ -426,5 +431,32 @@ describe('toMarkdown — round-trip invariants (§15.1)', () => {
       '## Done\n' +
       '- [x] **[P1] Other** <!-- id:b71e0c4d -->\n';
     expect(toMarkdown(parseTasks(canonical))).toBe(canonical);
+  });
+
+  // Golden-file round-trip for the real claude_life/TASKS.md (Phase 1 task 1e).
+  // The raw fixture is the unmodified pre-rewrite ledger: it uses the legacy
+  // H3-bucket project pattern that §15.1 / Q1 removes from the v1 grammar,
+  // so the *first* trip is intentionally lossy — H3 lines are silently
+  // dropped and their tasks merge into the parent H2. The H3 → [project:Name]
+  // rewrite is a separate consented migration step (plan §6.1) that lives
+  // outside the parse/emit cycle.
+  //
+  // The locked contract here is the byte-stability invariant: whatever the
+  // v1 grammar normalises the legacy file *to* on the first trip, every
+  // subsequent trip must round-trip that output unchanged. The canonical
+  // fixture lets future grammar changes surface as an explicit diff.
+  describe('claude_life/TASKS.md golden file', () => {
+    const legacyRaw = readFileSync(join(fixturesDir, 'legacy-tasks.md'), 'utf8');
+
+    it('first trip matches the locked canonical fixture', async () => {
+      const first = toMarkdown(parseTasks(legacyRaw));
+      await expect(first).toMatchFileSnapshot(join(fixturesDir, 'legacy-tasks.canonical.md'));
+    });
+
+    it('is byte-stable on the second trip', () => {
+      const first = toMarkdown(parseTasks(legacyRaw));
+      const second = toMarkdown(parseTasks(first));
+      expect(second).toBe(first);
+    });
   });
 });
