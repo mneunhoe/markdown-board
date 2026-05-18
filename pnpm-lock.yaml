@@ -23,6 +23,9 @@ importers:
       eslint-plugin-svelte:
         specifier: ^2.46.0
         version: 2.46.1(eslint@9.39.4)(svelte@5.55.7(@typescript-eslint/types@8.59.3))
+      globals:
+        specifier: ^14.0.0
+        version: 14.0.0
       prettier:
         specifier: ^3.3.3
         version: 3.8.3
