@@ -30,3 +30,16 @@ export interface Vault {
   prelude: string;
   sections: Section[];
 }
+
+export interface LibraryTable {
+  headers: string[];
+  rows: string[][];
+}
+
+export interface LibraryDoc {
+  title: string;
+  fields: Record<string, string>;
+  sections: Record<string, string>;
+  tables: LibraryTable[];
+  rawContent: string;
+}
