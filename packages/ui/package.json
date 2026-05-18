@@ -2,12 +2,41 @@
   "name": "@markdown-board/ui",
   "version": "0.0.0",
   "private": true,
-  "description": "Svelte 5 components and views. Real scaffold lands in Phase 1.",
+  "description": "Svelte 5 components, theme tokens, and views for markdown-board.",
   "type": "module",
+  "main": "./src/index.ts",
+  "svelte": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "svelte": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./theme/tokens.css": "./src/theme/tokens.css"
+  },
+  "files": [
+    "src"
+  ],
   "scripts": {
-    "build": "echo \"ui: scaffold lands in Phase 1\"",
-    "test": "echo \"ui: tests land in Phase 1\"",
-    "lint": "echo \"ui: lint config lands in Phase 1\"",
-    "typecheck": "echo \"ui: typecheck lands in Phase 1\""
+    "build": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "@markdown-board/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "@testing-library/svelte": "^5.2.4",
+    "@types/node": "^22.9.0",
+    "happy-dom": "^15.11.6",
+    "svelte": "^5.2.0",
+    "svelte-check": "^4.0.9",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.4"
   }
 }

@@ -1,4 +1,6 @@
 import js from '@eslint/js';
+import svelte from 'eslint-plugin-svelte';
+import svelteParser from 'svelte-eslint-parser';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -15,6 +17,7 @@ export default tseslint.config(
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  ...svelte.configs['flat/recommended'],
   {
     languageOptions: {
       ecmaVersion: 2022,
@@ -26,6 +29,16 @@ export default tseslint.config(
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
+    },
+  },
+  {
+    files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
+    languageOptions: {
+      parser: svelteParser,
+      parserOptions: {
+        parser: tseslint.parser,
+        extraFileExtensions: ['.svelte'],
+      },
     },
   },
 );

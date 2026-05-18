@@ -1,0 +1,70 @@
+/*
+ * markdown-board theme tokens.
+ *
+ * Light-mode palette is a verbatim port of dashboard.html:14-26 (the prototype
+ * `:root` block). Dark mode is provisional — the prototype has no dark theme,
+ * so these values are placeholders to be tightened in Phase 3 (plan §7.3).
+ * Per-priority and per-day colour vars are extracted from the prototype's
+ * inline class rules (priority chip lines 286-364; DAY_COLORS map
+ * dashboard.html:2146-2154).
+ *
+ * Theme switching contract: the host app toggles `data-theme="dark"` on
+ * `<html>` (or any ancestor of the components). OS-preference auto-switching
+ * lands in Phase 3 alongside the settings UI.
+ */
+
+:root {
+  /* Surfaces */
+  --bg-primary: #faf9f5;
+  --bg-secondary: #f5f4ef;
+  --bg-card: #ffffff;
+
+  /* Text */
+  --text-primary: #141413;
+  --text-secondary: #5c5c5a;
+  --text-muted: #8c8c8a;
+
+  /* Accent (Claude orange in the prototype; renamed visually here but kept
+     at the same hex so existing user themes don't shift). */
+  --accent: #d97757;
+  --accent-hover: #c4684a;
+
+  /* Lines and shadows */
+  --border: #e5e4df;
+  --border-light: #eeeee9;
+  --shadow: rgba(20, 20, 19, 0.04);
+  --shadow-hover: rgba(20, 20, 19, 0.08);
+
+  /* Priority tier colours. `blocker` is new in v1 (no prototype equivalent);
+     `high` matches the prototype's `.priority-high` red; `low` matches the
+     muted treatment of `.priority-chip.priority-low`. */
+  --priority-blocker: #8b1a13;
+  --priority-high: #c0392b;
+  --priority-low-bg: var(--bg-secondary);
+  --priority-low-fg: var(--text-muted);
+
+  /* Day-of-week colours (DAY_COLORS map, dashboard.html:2146-2154). */
+  --day-mon: hsl(210, 55%, 48%);
+  --day-tue: hsl(150, 45%, 42%);
+  --day-wed: hsl(280, 45%, 50%);
+  --day-thu: hsl(30, 70%, 48%);
+  --day-fri: hsl(0, 60%, 50%);
+  --day-sat: hsl(195, 50%, 45%);
+  --day-sun: hsl(330, 45%, 50%);
+}
+
+[data-theme='dark'] {
+  --bg-primary: #1a1a18;
+  --bg-secondary: #232321;
+  --bg-card: #2a2a28;
+  --text-primary: #f0eee8;
+  --text-secondary: #b0aea8;
+  --text-muted: #7a7874;
+  --accent: #e08967;
+  --accent-hover: #d97757;
+  --border: #3a3a37;
+  --border-light: #2f2f2c;
+  --shadow: rgba(0, 0, 0, 0.2);
+  --shadow-hover: rgba(0, 0, 0, 0.35);
+  --priority-low-bg: #2f2f2c;
+}
