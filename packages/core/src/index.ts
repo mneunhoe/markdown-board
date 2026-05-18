@@ -1,3 +1,4 @@
 export const CORE_VERSION = '0.0.0';
 
 export * from './grammar/index.js';
+export * from './store/index.js';
