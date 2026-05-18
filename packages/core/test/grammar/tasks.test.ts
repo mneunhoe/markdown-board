@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseTasks } from '../../src/grammar/tasks.js';
+import { parseTasks, toMarkdown } from '../../src/grammar/tasks.js';
 import type { Task, Vault } from '../../src/grammar/types.js';
 
 // Canonical §15.1 example: one section, one fully-tokenised task with an
@@ -219,5 +219,212 @@ describe('parseTasks — line endings', () => {
     const input = '## Active\r\n- [ ] **Title** <!-- id:00000030 -->\r\n';
     const v = parseTasks(input);
     expect(v.sections[0]?.tasks[0]?.title).toBe('Title');
+  });
+});
+
+describe('toMarkdown — canonical §15.1 example', () => {
+  it('round-trips the fully-tokenised task byte-stable on first trip', () => {
+    const input =
+      '## Active\n' +
+      '- [ ] **[P0] [project:Foo] [Mon] [pom:3] Title** - the note <!-- id:a3f8c4e1 -->\n';
+    expect(toMarkdown(parseTasks(input))).toBe(input);
+  });
+});
+
+describe('toMarkdown — token canonical order', () => {
+  it('emits tokens in [P*] [project:Name] [Day] [pom:N] order regardless of input order', () => {
+    const shuffled =
+      '## Active\n' +
+      '- [ ] **[Mon] [pom:3] [project:Foo] [P0] Title** <!-- id:0000aaaa -->\n';
+    const expected =
+      '## Active\n' +
+      '- [ ] **[P0] [project:Foo] [Mon] [pom:3] Title** <!-- id:0000aaaa -->\n';
+    expect(toMarkdown(parseTasks(shuffled))).toBe(expected);
+  });
+
+  it('emits each priority tier with the right token', () => {
+    const cases: Array<[Task['priority'], string]> = [
+      ['blocker', '[P0]'],
+      ['high', '[P1]'],
+      ['low', '[P3]'],
+    ];
+    for (const [priority, token] of cases) {
+      const v: Vault = {
+        prelude: '',
+        sections: [
+          {
+            id: 'active',
+            name: 'Active',
+            tasks: [
+              {
+                id: 'deadbeef',
+                checked: false,
+                title: 'T',
+                note: '',
+                priority,
+                project: null,
+                day: null,
+                pomodoros: 0,
+                subtasks: [],
+              },
+            ],
+          },
+        ],
+      };
+      expect(toMarkdown(v)).toBe(`## Active\n- [ ] **${token} T** <!-- id:deadbeef -->\n`);
+    }
+  });
+
+  it('omits the priority token entirely when priority is null ([P2] is parsed-and-stripped)', () => {
+    const input = '## Active\n- [ ] **[P2] Title** <!-- id:0000bbbb -->\n';
+    const expected = '## Active\n- [ ] **Title** <!-- id:0000bbbb -->\n';
+    expect(toMarkdown(parseTasks(input))).toBe(expected);
+  });
+
+  it('omits [pom:0] on emit', () => {
+    const input = '## Active\n- [ ] **[pom:0] Title** <!-- id:0000cccc -->\n';
+    const expected = '## Active\n- [ ] **Title** <!-- id:0000cccc -->\n';
+    expect(toMarkdown(parseTasks(input))).toBe(expected);
+  });
+
+  it('normalises day tokens to the canonical 3-letter abbreviation', () => {
+    const input = '## Active\n- [ ] **[Monday] Title** <!-- id:0000dddd -->\n';
+    const expected = '## Active\n- [ ] **[Mon] Title** <!-- id:0000dddd -->\n';
+    expect(toMarkdown(parseTasks(input))).toBe(expected);
+  });
+
+  it('preserves inner whitespace in [project:Name]', () => {
+    const input = '## Active\n- [ ] **[project:Hello World] Title** <!-- id:0000eeee -->\n';
+    expect(toMarkdown(parseTasks(input))).toBe(input);
+  });
+});
+
+describe('toMarkdown — task body', () => {
+  it('uses lowercase [x] for done tasks', () => {
+    const input = '## Active\n- [X] **Title** <!-- id:0000f001 -->\n';
+    const expected = '## Active\n- [x] **Title** <!-- id:0000f001 -->\n';
+    expect(toMarkdown(parseTasks(input))).toBe(expected);
+  });
+
+  it('adds the bold wrap when the input was a plain title', () => {
+    const input = '## Active\n- [ ] plain title <!-- id:0000f002 -->\n';
+    const expected = '## Active\n- [ ] **plain title** <!-- id:0000f002 -->\n';
+    expect(toMarkdown(parseTasks(input))).toBe(expected);
+  });
+
+  it('emits the note with a leading " - " separator', () => {
+    const v: Vault = {
+      prelude: '',
+      sections: [
+        {
+          id: 'active',
+          name: 'Active',
+          tasks: [
+            {
+              id: '0000f003',
+              checked: false,
+              title: 'Title',
+              note: 'the note',
+              priority: null,
+              project: null,
+              day: null,
+              pomodoros: 0,
+              subtasks: [],
+            },
+          ],
+        },
+      ],
+    };
+    expect(toMarkdown(v)).toBe('## Active\n- [ ] **Title** - the note <!-- id:0000f003 -->\n');
+  });
+
+  it('omits the trailing id comment when task.id is empty', () => {
+    const input = '## Active\n- [ ] **Title**\n';
+    expect(toMarkdown(parseTasks(input))).toBe(input);
+  });
+
+  it('emits subtasks with two-space indentation immediately under the parent', () => {
+    const input =
+      '## Active\n' +
+      '- [ ] **Parent** <!-- id:0000f004 -->\n' +
+      '  - [ ] open sub\n' +
+      '  - [x] done sub\n';
+    expect(toMarkdown(parseTasks(input))).toBe(input);
+  });
+});
+
+describe('toMarkdown — section spacing', () => {
+  it('separates sections with exactly one blank line and no leading/trailing blanks', () => {
+    const input =
+      '## Active\n' +
+      '- [ ] **A** <!-- id:0000aa01 -->\n' +
+      '## Done\n' +
+      '- [x] **B** <!-- id:0000aa02 -->\n';
+    const expected =
+      '## Active\n' +
+      '- [ ] **A** <!-- id:0000aa01 -->\n' +
+      '\n' +
+      '## Done\n' +
+      '- [x] **B** <!-- id:0000aa02 -->\n';
+    expect(toMarkdown(parseTasks(input))).toBe(expected);
+  });
+
+  it('preserves empty sections', () => {
+    const input = '## Active\n## Done\n';
+    const expected = '## Active\n\n## Done\n';
+    expect(toMarkdown(parseTasks(input))).toBe(expected);
+  });
+
+  it('strips the bold wrap on H2 names (first-trip normalisation)', () => {
+    const input = '## **Active**\n- [ ] **T** <!-- id:0000aa03 -->\n';
+    const expected = '## Active\n- [ ] **T** <!-- id:0000aa03 -->\n';
+    expect(toMarkdown(parseTasks(input))).toBe(expected);
+  });
+});
+
+describe('toMarkdown — prelude', () => {
+  it('emits the prelude verbatim followed by a blank line before the first H2', () => {
+    const input = '# Tasks\n\nA description.\n\n## Active\n';
+    expect(toMarkdown(parseTasks(input))).toBe(input);
+  });
+
+  it('omits any leading content when the prelude is empty', () => {
+    const v: Vault = {
+      prelude: '',
+      sections: [{ id: 'active', name: 'Active', tasks: [] }],
+    };
+    expect(toMarkdown(v)).toBe('## Active\n');
+  });
+
+  it('returns an empty string for an empty vault', () => {
+    expect(toMarkdown({ prelude: '', sections: [] })).toBe('');
+  });
+});
+
+describe('toMarkdown — round-trip invariants (§15.1)', () => {
+  it('is byte-stable on the second trip for a non-canonical input', () => {
+    const denormalised =
+      '## **Active**\r\n' +
+      '- [X] **[Mon] [pom:0] [P2] plain title**\r\n' +
+      '## Done\r\n' +
+      '- [ ] **[pom:3] [project:Foo] [P1] Title** the note <!-- id:0000bb01 -->\r\n';
+
+    const first = toMarkdown(parseTasks(denormalised));
+    const second = toMarkdown(parseTasks(first));
+    expect(second).toBe(first);
+  });
+
+  it('is byte-stable on the first trip for an already-canonical input', () => {
+    const canonical =
+      '# Tasks\n' +
+      '\n' +
+      '## Active\n' +
+      '- [ ] **[P0] [project:Foo] [Mon] [pom:3] Title** - the note <!-- id:a3f8c4e1 -->\n' +
+      '  - [ ] open sub\n' +
+      '  - [x] done sub\n' +
+      '\n' +
+      '## Done\n' +
+      '- [x] **[P1] Other** <!-- id:b71e0c4d -->\n';
+    expect(toMarkdown(parseTasks(canonical))).toBe(canonical);
   });
 });

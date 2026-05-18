@@ -211,6 +211,55 @@ export function parseTasks(input: string, _options: ParseTasksOptions = {}): Vau
   };
 }
 
-export function toMarkdown(_vault: Vault): string {
-  throw new Error('toMarkdown: not implemented');
+function priorityToToken(priority: Priority): string | null {
+  switch (priority) {
+    case 'blocker':
+      return 'P0';
+    case 'high':
+      return 'P1';
+    case 'low':
+      return 'P3';
+    case null:
+    default:
+      return null;
+  }
+}
+
+function emitTokens(task: Task): string {
+  const parts: string[] = [];
+  const p = priorityToToken(task.priority);
+  if (p) parts.push(`[${p}]`);
+  if (task.project) parts.push(`[project:${task.project}]`);
+  if (task.day) parts.push(`[${task.day}]`);
+  if (task.pomodoros > 0) parts.push(`[pom:${task.pomodoros}]`);
+  return parts.length > 0 ? parts.join(' ') + ' ' : '';
+}
+
+function emitTask(task: Task): string {
+  const checkbox = task.checked ? '[x]' : '[ ]';
+  const titleBody = `${emitTokens(task)}${task.title}`;
+  const note = task.note ? ` - ${task.note}` : '';
+  const idSuffix = task.id ? ` <!-- id:${task.id} -->` : '';
+  let out = `- ${checkbox} **${titleBody}**${note}${idSuffix}\n`;
+  for (const st of task.subtasks) {
+    const sc = st.checked ? '[x]' : '[ ]';
+    out += `  - ${sc} ${st.text}\n`;
+  }
+  return out;
+}
+
+export function toMarkdown(vault: Vault): string {
+  let out = '';
+  if (vault.prelude) {
+    out += `${vault.prelude}\n\n`;
+  }
+  for (let i = 0; i < vault.sections.length; i++) {
+    if (i > 0) out += '\n';
+    const section = vault.sections[i]!;
+    out += `## ${section.name}\n`;
+    for (const task of section.tasks) {
+      out += emitTask(task);
+    }
+  }
+  return out ? `${out.trimEnd()}\n` : '';
 }
