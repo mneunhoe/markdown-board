@@ -1,0 +1,7 @@
+{
+  "name": "@markdown-board/plugin-archive-resolver",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Resolve-and-archive modal. Phase 4 deliverable.",
+  "type": "module"
+}

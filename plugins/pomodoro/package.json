@@ -1,0 +1,7 @@
+{
+  "name": "@markdown-board/plugin-pomodoro",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pomodoro chip and state machine. Phase 4 deliverable.",
+  "type": "module"
+}

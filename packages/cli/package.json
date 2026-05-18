@@ -1,0 +1,13 @@
+{
+  "name": "@markdown-board/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Headless task operations against a vault. Phase 5+ deliverable.",
+  "type": "module",
+  "scripts": {
+    "build": "echo \"cli: implementation lands in Phase 5+\"",
+    "test": "echo \"cli: tests land in Phase 5+\"",
+    "lint": "echo \"cli: lint config lands in Phase 5+\"",
+    "typecheck": "echo \"cli: typecheck lands in Phase 5+\""
+  }
+}

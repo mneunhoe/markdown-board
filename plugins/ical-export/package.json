@@ -1,0 +1,7 @@
+{
+  "name": "@markdown-board/plugin-ical-export",
+  "version": "0.0.0",
+  "private": true,
+  "description": "iCal (RFC 5545) export of scheduled tasks. Phase 4 deliverable.",
+  "type": "module"
+}

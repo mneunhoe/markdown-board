@@ -1,0 +1,13 @@
+{
+  "name": "@markdown-board/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Static SvelteKit web demo. Opens a local vault via the File System Access API. Real scaffold lands in Phase 1.",
+  "type": "module",
+  "scripts": {
+    "build": "echo \"web: SvelteKit scaffold lands in Phase 1\"",
+    "test": "echo \"web: Playwright suite lands in Phase 1\"",
+    "lint": "echo \"web: lint config lands in Phase 1\"",
+    "typecheck": "echo \"web: typecheck lands in Phase 1\""
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@markdown-board/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tauri 2 desktop shell. Reuses @markdown-board/ui. Real scaffold lands in Phase 2.",
+  "type": "module",
+  "scripts": {
+    "build": "echo \"desktop: Tauri scaffold lands in Phase 2\"",
+    "test": "echo \"desktop: Playwright + Tauri smoke tests land in Phase 2\"",
+    "lint": "echo \"desktop: lint config lands in Phase 2\"",
+    "typecheck": "echo \"desktop: typecheck lands in Phase 2\""
+  }
+}
