@@ -105,5 +105,15 @@ describe('App (web shell)', () => {
         expect(container.querySelector('[role=alert]')?.textContent).toContain('disk on fire');
       });
     });
+
+    // Note: the autosave + external-watcher wiring inside App.svelte is
+    // exercised through the unit tests for the pieces (`Autosaver`,
+    // `ExternalChangeWatcher`, `moveTask` / `moveColumn`) and through a
+    // manual browser pass against ~/Desktop/claude_life. A render-and-
+    // synthetic-mutation integration test is impractical at slice 4 —
+    // the move handlers live inside the rendered tree and the DnD
+    // gesture path requires pragmatic-dnd's real DOM event sequence,
+    // which happy-dom can't replay faithfully. Slice 5 will add a
+    // Playwright suite that drives the full UI in a real browser.
   });
 });

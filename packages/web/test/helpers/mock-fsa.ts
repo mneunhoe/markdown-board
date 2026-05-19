@@ -12,17 +12,30 @@
 
 export class MockFileHandle {
   readonly kind = 'file' as const;
+  public lastModified: number;
+
   constructor(
     readonly name: string,
     public contents = '',
-  ) {}
+    lastModified?: number,
+  ) {
+    this.lastModified = lastModified ?? Date.now();
+  }
 
   async getFile(): Promise<File> {
-    return new File([this.contents], this.name, { type: 'text/plain' });
+    return new File([this.contents], this.name, {
+      type: 'text/plain',
+      lastModified: this.lastModified,
+    });
   }
 
   async createWritable(): Promise<MockWritableStream> {
     return new MockWritableStream(this);
+  }
+
+  /** Test helper: bump the file's modified-time without changing contents. */
+  touch(time?: number): void {
+    this.lastModified = time ?? Date.now();
   }
 }
 
@@ -36,6 +49,7 @@ export class MockWritableStream {
 
   async close(): Promise<void> {
     this.target.contents = this.buffer;
+    this.target.lastModified = Date.now();
   }
 }
 

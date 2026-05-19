@@ -1,19 +1,31 @@
 <script lang="ts">
-  import { EmptyState } from '@markdown-board/ui';
+  import { toMarkdown } from '@markdown-board/core';
+  import { EmptyState, type ColumnMoveHandler, type TaskMoveHandler } from '@markdown-board/ui';
   import { FSAFileAdapter } from './lib/adapters/index.js';
   import VaultWorkspace from './components/VaultWorkspace.svelte';
   import {
+    Autosaver,
+    ExternalChangeWatcher,
     FileSystemAccessUnsupportedError,
     VaultPickerCancelledError,
     isFileSystemAccessSupported,
     loadVault,
+    moveColumn,
+    moveTask,
     pickVaultDirectory,
     type LoadedVault,
   } from './lib/vault/index.js';
 
+  const TASKS_PATH = 'TASKS.md';
+
   let loaded = $state<LoadedVault | null>(null);
   let loading = $state(false);
   let error = $state<string | null>(null);
+  let lastWrittenMd = $state<string>('');
+
+  let adapter: FSAFileAdapter | null = null;
+  let autosaver: Autosaver | null = null;
+  let watcher: ExternalChangeWatcher | null = null;
 
   const supported = isFileSystemAccessSupported();
 
@@ -22,8 +34,7 @@
     loading = true;
     try {
       const handle = await pickVaultDirectory();
-      const adapter = new FSAFileAdapter(handle);
-      loaded = await loadVault(adapter);
+      await mountVault(new FSAFileAdapter(handle));
     } catch (err) {
       if (err instanceof VaultPickerCancelledError) return;
       if (err instanceof FileSystemAccessUnsupportedError) {
@@ -35,6 +46,84 @@
       loading = false;
     }
   }
+
+  async function mountVault(next: FSAFileAdapter): Promise<void> {
+    teardownIo();
+    adapter = next;
+    const fresh = await loadVault(next);
+    const canonical = toMarkdown(fresh.vault);
+    lastWrittenMd = canonical;
+    loaded = fresh;
+    const initialMtime = await safeMtime(next, TASKS_PATH);
+    autosaver = new Autosaver({
+      write: async (md) => {
+        await next.writeFile(TASKS_PATH, md);
+        lastWrittenMd = md;
+        const mtime = await safeMtime(next, TASKS_PATH);
+        watcher?.setBaseline(mtime);
+      },
+      onError: (err: unknown) => {
+        error = `Autosave failed: ${err instanceof Error ? err.message : String(err)}`;
+      },
+    });
+    watcher = new ExternalChangeWatcher({
+      getMtime: () => next.getMtime(TASKS_PATH),
+      initialMtime,
+      isLocalWritePending: () => autosaver?.isPending ?? false,
+      onExternalChange: async () => {
+        if (!adapter || autosaver?.isPending) return;
+        const reloaded = await loadVault(adapter);
+        lastWrittenMd = toMarkdown(reloaded.vault);
+        loaded = reloaded;
+        watcher?.setBaseline(await safeMtime(adapter, TASKS_PATH));
+      },
+      onError: () => {
+        // Transient mtime failures (file briefly missing during external
+        // rewrite) are expected — silently skip the tick.
+      },
+    });
+    watcher.start();
+  }
+
+  function teardownIo(): void {
+    autosaver?.dispose();
+    watcher?.dispose();
+    autosaver = null;
+    watcher = null;
+    adapter = null;
+  }
+
+  async function safeMtime(a: FSAFileAdapter, path: string): Promise<number> {
+    try {
+      return await a.getMtime(path);
+    } catch {
+      return 0;
+    }
+  }
+
+  const onTaskMove: TaskMoveHandler = (move) => {
+    if (!loaded) return;
+    moveTask(loaded.vault, move);
+  };
+
+  const onColumnMove: ColumnMoveHandler = (move) => {
+    if (!loaded) return;
+    moveColumn(loaded.vault, move);
+  };
+
+  // Autosave $effect — re-runs on any deep mutation of `loaded.vault`
+  // (Svelte 5's proxy traverses sections/tasks). Schedules a write when
+  // the canonical markdown drifts from what we last wrote.
+  $effect(() => {
+    if (!loaded || !autosaver) return;
+    const md = toMarkdown(loaded.vault);
+    if (md === lastWrittenMd) return;
+    autosaver.schedule(md);
+  });
+
+  $effect(() => {
+    return () => teardownIo();
+  });
 </script>
 
 <main class="shell">
@@ -55,7 +144,12 @@
 
   <section class="body" class:empty={!loaded}>
     {#if loaded}
-      <VaultWorkspace vault={loaded.vault} libraryDocs={loaded.libraryDocs} />
+      <VaultWorkspace
+        vault={loaded.vault}
+        libraryDocs={loaded.libraryDocs}
+        {onTaskMove}
+        {onColumnMove}
+      />
     {:else if !supported}
       <EmptyState
         title="File System Access API not supported"

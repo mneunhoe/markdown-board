@@ -5,3 +5,12 @@ export {
   isFileSystemAccessSupported,
   pickVaultDirectory,
 } from './picker.js';
+export { Autosaver, type AutosaverOptions } from './autosave.js';
+export { ExternalChangeWatcher, type ExternalChangeWatcherOptions } from './watcher.js';
+export {
+  ensureUniqueTaskIds,
+  moveColumn,
+  moveTask,
+  type ColumnMove,
+  type TaskMove,
+} from './mutate.js';

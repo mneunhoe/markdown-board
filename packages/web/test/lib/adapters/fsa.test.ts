@@ -230,6 +230,40 @@ describe('FSAFileAdapter', () => {
     });
   });
 
+  describe('getMtime', () => {
+    it('returns the file lastModified for an existing file', async () => {
+      const root = seedVault({});
+      const file = await root.getFileHandle('TASKS.md', { create: true });
+      file.touch(12345);
+      const adapter = new FSAFileAdapter(asRoot(root));
+      expect(await adapter.getMtime('TASKS.md')).toBe(12345);
+    });
+
+    it('bumps after writeFile', async () => {
+      const root = seedVault({ 'TASKS.md': 'old' });
+      const file = await root.getFileHandle('TASKS.md');
+      file.touch(1);
+      const adapter = new FSAFileAdapter(asRoot(root));
+      const before = await adapter.getMtime('TASKS.md');
+      await adapter.writeFile('TASKS.md', 'new');
+      const after = await adapter.getMtime('TASKS.md');
+      expect(after).toBeGreaterThan(before);
+    });
+
+    it('throws FileNotFoundError for a missing file', async () => {
+      const { adapter } = build({});
+      await expect(adapter.getMtime('missing.md')).rejects.toBeInstanceOf(FileNotFoundError);
+    });
+
+    it('normalises the path', async () => {
+      const root = seedVault({});
+      const file = await root.getFileHandle('TASKS.md', { create: true });
+      file.touch(9999);
+      const adapter = new FSAFileAdapter(asRoot(root));
+      expect(await adapter.getMtime('/TASKS.md/')).toBe(9999);
+    });
+  });
+
   describe('path normalisation', () => {
     it('treats backslashes as path separators', async () => {
       const { adapter } = build({ 'a/b/c.md': 'hi' });

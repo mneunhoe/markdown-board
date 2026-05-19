@@ -6,6 +6,7 @@
 
 import type { FileAdapter, LibraryDoc, Vault } from '@markdown-board/core';
 import { FileNotFoundError, parseLibrary, parseTasks } from '@markdown-board/core';
+import { ensureUniqueTaskIds } from './mutate.js';
 
 export interface LoadedVault {
   vault: Vault;
@@ -15,6 +16,10 @@ export interface LoadedVault {
 export async function loadVault(adapter: FileAdapter): Promise<LoadedVault> {
   const tasksMd = await readOrEmpty(adapter, 'TASKS.md');
   const vault = parseTasks(tasksMd);
+  // Mint missing / colliding ids so DnD reorder handlers can identify
+  // tasks unambiguously. The next autosave persists the new ids as
+  // `<!-- id:... -->` comments per the §15.1 emitter contract.
+  ensureUniqueTaskIds(vault);
 
   const paths = await collectLibraryMarkdownPaths(adapter);
   const libraryDocs: LibraryDoc[] = [];

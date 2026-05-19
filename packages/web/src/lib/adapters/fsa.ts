@@ -53,6 +53,21 @@ export class FSAFileAdapter implements FileAdapter {
     return await file.text();
   }
 
+  /**
+   * Read the `lastModified` timestamp (epoch ms) for a file. The shell's
+   * external-change watcher uses this to detect out-of-band edits between
+   * autosaves. FileAdapter-extension, not interface-mandated — the
+   * in-memory adapter doesn't expose it; the watcher is paired with this
+   * adapter directly.
+   */
+  async getMtime(path: string): Promise<number> {
+    const p = normalisePath(path);
+    const handle = await this.resolveFileHandle(p, false);
+    if (!handle) throw new FileNotFoundError(p);
+    const file = await handle.getFile();
+    return file.lastModified;
+  }
+
   async writeFile(path: string, contents: string): Promise<void> {
     const p = normalisePath(path);
     if (p === '') throw new Error('Cannot write to vault root');
