@@ -7,6 +7,7 @@
   import type { ResolveHandler } from '../lib/resolve.js';
   import type {
     DayEditOpenHandler,
+    FullTaskEditHandler,
     NoteEditHandler,
     PriorityCycleHandler,
     ProjectEditOpenHandler,
@@ -54,6 +55,7 @@
     onProjectEdit?: ProjectEditOpenHandler;
     onDayEdit?: DayEditOpenHandler;
     onSectionRename?: SectionRenameHandler;
+    onFullTaskEdit?: FullTaskEditHandler;
   }
 
   const {
@@ -73,6 +75,7 @@
     onProjectEdit,
     onDayEdit,
     onSectionRename,
+    onFullTaskEdit,
   }: Props = $props();
 
   const hasSections = $derived(vault.sections.length > 0);
@@ -180,6 +183,11 @@
                   ? {
                       onDayEdit: () =>
                         onDayEdit({ taskId: task.id, sectionId: section.id }, task.day),
+                    }
+                  : {}}
+                {...onFullTaskEdit
+                  ? {
+                      onFullEdit: () => onFullTaskEdit({ taskId: task.id, sectionId: section.id }),
                     }
                   : {}}
               />

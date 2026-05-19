@@ -31,6 +31,8 @@
     onProjectEdit?: () => void;
     /** Slice 6b — click DayChip (or "+ Day" hint) to open the picker. */
     onDayEdit?: () => void;
+    /** Slice 6e — pencil button opens the full task-edit modal. */
+    onFullEdit?: () => void;
   }
 
   const {
@@ -45,6 +47,7 @@
     onPriorityCycle,
     onProjectEdit,
     onDayEdit,
+    onFullEdit,
   }: Props = $props();
 
   const checkboxInteractive = $derived(onResolve !== undefined);
@@ -54,6 +57,7 @@
   const subtaskAddable = $derived(onSubtaskAdd !== undefined);
   const subtaskToggleable = $derived(onSubtaskToggle !== undefined);
   const deletable = $derived(onDelete !== undefined);
+  const fullEditable = $derived(onFullEdit !== undefined);
 
   // Inline-edit state. Only one target may be active at a time. The active
   // target is mirrored to the input via bind:value; commit on Enter/blur,
@@ -125,6 +129,16 @@
         title="Delete task"
         data-testid="task-delete"
         onclick={() => onDelete?.()}>×</button
+      >
+    {/if}
+    {#if fullEditable}
+      <button
+        type="button"
+        class="full-edit-btn"
+        aria-label="Edit {task.title} in full editor"
+        title="Edit task…"
+        data-testid="task-full-edit"
+        onclick={() => onFullEdit?.()}>✎</button
       >
     {/if}
     <input
@@ -329,6 +343,33 @@
 
   .delete-btn:hover {
     color: var(--priority-high, #c0392b);
+  }
+
+  .full-edit-btn {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0;
+    width: 16px;
+    height: 16px;
+    line-height: 1;
+    font-size: 14px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition:
+      opacity 0.1s ease,
+      color 0.1s ease;
+  }
+
+  .task-card:hover .full-edit-btn,
+  .full-edit-btn:focus-visible {
+    opacity: 1;
+  }
+
+  .full-edit-btn:hover {
+    color: var(--accent);
   }
 
   .card-checkbox {

@@ -258,6 +258,32 @@ function emitTask(task: Task): string {
   return out;
 }
 
+/**
+ * Round-trip helpers for editing a single task as raw markdown.
+ *
+ * `emitTaskBlock(task)` — emit the task line + indented subtask lines
+ * exactly as they'd appear inside a section in TASKS.md (per spec §3.4 /
+ * §3.10). Useful for pre-filling a "raw markdown" editor tab.
+ *
+ * `parseTaskBlock(raw)` — wrap the supplied raw markdown under a
+ * synthetic H2 so it can ride through `parseTasks` unchanged, then
+ * extract the single resulting task. Returns `null` when the input
+ * doesn't produce exactly one task (empty, no checkbox line, multiple
+ * tasks). Subtask lines must follow the canonical two-space indent
+ * documented in §3.10.
+ */
+export function emitTaskBlock(task: Task): string {
+  return emitTask(task).trimEnd();
+}
+
+export function parseTaskBlock(raw: string): Task | null {
+  const wrapped = `## __mb_tmp__\n${raw.replace(/\r\n?/g, '\n')}\n`;
+  const vault = parseTasks(wrapped);
+  const section = vault.sections[0];
+  if (!section || section.tasks.length !== 1) return null;
+  return section.tasks[0] ?? null;
+}
+
 export function toMarkdown(vault: Vault): string {
   let out = '';
   if (vault.prelude) {

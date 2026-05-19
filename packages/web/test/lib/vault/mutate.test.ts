@@ -11,6 +11,7 @@ import {
   moveTask,
   renameSection,
   setSubtaskText,
+  setTask,
   setTaskDay,
   setTaskNote,
   setTaskPriority,
@@ -406,5 +407,77 @@ describe('allProjects', () => {
 
   it('returns [] when no tasks have projects', () => {
     expect(allProjects(vault())).toEqual([]);
+  });
+});
+
+describe('setTask (slice 6e)', () => {
+  it('replaces the task object in place', () => {
+    const v = vault();
+    const ok = setTask(
+      v,
+      { taskId: 'a', sectionId: 'active' },
+      {
+        id: 'ignored',
+        checked: true,
+        title: 'Renamed',
+        note: 'fresh',
+        priority: 'blocker',
+        project: 'Foo',
+        day: 'Wed',
+        pomodoros: 4,
+        subtasks: [{ text: 'first', checked: false }],
+      },
+    );
+    expect(ok).toBe(true);
+    const t = v.sections[0]?.tasks[0];
+    expect(t?.title).toBe('Renamed');
+    expect(t?.note).toBe('fresh');
+    expect(t?.priority).toBe('blocker');
+    expect(t?.project).toBe('Foo');
+    expect(t?.day).toBe('Wed');
+    expect(t?.pomodoros).toBe(4);
+    expect(t?.subtasks).toEqual([{ text: 'first', checked: false }]);
+  });
+
+  it('preserves the original id and checked state even if `next` carries different values', () => {
+    const v = vault();
+    setTask(
+      v,
+      { taskId: 'a', sectionId: 'active' },
+      {
+        id: 'should-be-ignored',
+        checked: true,
+        title: 'X',
+        note: '',
+        priority: null,
+        project: null,
+        day: null,
+        pomodoros: 0,
+        subtasks: [],
+      },
+    );
+    const t = v.sections[0]?.tasks[0];
+    expect(t?.id).toBe('a');
+    expect(t?.checked).toBe(false);
+  });
+
+  it('returns false for a stale target', () => {
+    expect(
+      setTask(
+        vault(),
+        { taskId: 'ghost', sectionId: 'active' },
+        {
+          id: 'x',
+          checked: false,
+          title: 'X',
+          note: '',
+          priority: null,
+          project: null,
+          day: null,
+          pomodoros: 0,
+          subtasks: [],
+        },
+      ),
+    ).toBe(false);
   });
 });

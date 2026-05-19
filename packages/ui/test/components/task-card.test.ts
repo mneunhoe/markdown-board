@@ -306,5 +306,19 @@ describe('TaskCard', () => {
       await fireEvent.click(cbs[1]!);
       expect(onSubtaskToggle).toHaveBeenCalledWith(1);
     });
+
+    it('without onFullEdit, no pencil button is rendered', () => {
+      const { container } = render(TaskCard, { task: makeTask() });
+      expect(container.querySelector('[data-testid="task-full-edit"]')).toBeNull();
+    });
+
+    it('with onFullEdit, clicking the pencil button calls onFullEdit (slice 6e)', async () => {
+      const onFullEdit = vi.fn();
+      const { container } = render(TaskCard, { task: makeTask(), onFullEdit });
+      const btn = container.querySelector<HTMLButtonElement>('[data-testid="task-full-edit"]');
+      expect(btn).toBeTruthy();
+      await fireEvent.click(btn!);
+      expect(onFullEdit).toHaveBeenCalledOnce();
+    });
   });
 });

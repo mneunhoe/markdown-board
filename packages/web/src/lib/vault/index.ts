@@ -18,6 +18,7 @@ export {
   moveTask,
   renameSection,
   setSubtaskText,
+  setTask,
   setTaskDay,
   setTaskNote,
   setTaskPriority,

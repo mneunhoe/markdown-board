@@ -6,6 +6,7 @@
     type ColumnMoveHandler,
     type DayEditOpenHandler,
     type EditTarget,
+    type FullTaskEditHandler,
     type NoteEditHandler,
     type PriorityCycleHandler,
     type ProjectEditOpenHandler,
@@ -24,6 +25,7 @@
   import ProjectPickerModal from './components/ProjectPickerModal.svelte';
   import ResolveModal from './components/ResolveModal.svelte';
   import SettingsModal from './components/SettingsModal.svelte';
+  import TaskEditModal from './components/TaskEditModal.svelte';
   import VaultWorkspace from './components/VaultWorkspace.svelte';
   import { applyTheme, loadSettings, saveSettings, type Settings } from './lib/settings.js';
   import {
@@ -46,6 +48,7 @@
     renameSection,
     saveLibraryFile,
     setSubtaskText,
+    setTask,
     setTaskDay,
     setTaskNote,
     setTaskProject,
@@ -73,6 +76,10 @@
   // Library editor (slice 6d). `path: null` ⇒ New File dialog.
   let libraryEditor = $state<{ path: string | null; initialContent: string } | null>(null);
   let savingLibrary = $state(false);
+  // Full task editor (slice 6e). `target` identifies the task being
+  // edited; `snapshot` is captured at open-time so a concurrent external
+  // reload can't shift the form data.
+  let taskEditor = $state<{ target: EditTarget; snapshot: Task } | null>(null);
 
   let adapter: FSAFileAdapter | null = null;
   let autosaver: Autosaver | null = null;
@@ -250,6 +257,32 @@
     libraryEditor = null;
   }
 
+  const onFullTaskEdit: FullTaskEditHandler = (target) => {
+    if (!loaded) return;
+    const found = findTask(loaded.vault, target);
+    if (!found) return;
+    // Snapshot the task so the modal owns its own form state — mutations
+    // on the live proxy from elsewhere (external reload, autosave round-
+    // trip) don't leak into the open form.
+    taskEditor = {
+      target,
+      snapshot: { ...found.task, subtasks: found.task.subtasks.map((s) => ({ ...s })) },
+    };
+  };
+
+  function confirmTaskEditor(next: Task): void {
+    if (!loaded || !taskEditor) {
+      taskEditor = null;
+      return;
+    }
+    setTask(loaded.vault, taskEditor.target, next);
+    taskEditor = null;
+  }
+
+  function cancelTaskEditor(): void {
+    taskEditor = null;
+  }
+
   function confirmProjectPicker(next: string | null): void {
     if (!projectPicker || !loaded) {
       projectPicker = null;
@@ -376,6 +409,7 @@
         {onDayEdit}
         {onSectionRename}
         onLibraryEdit={openLibraryEditor}
+        {onFullTaskEdit}
       />
     {:else if !supported}
       <EmptyState
@@ -438,6 +472,13 @@
     initialContent={libraryEditor?.initialContent ?? ''}
     onConfirm={confirmLibraryEditor}
     onCancel={cancelLibraryEditor}
+  />
+
+  <TaskEditModal
+    task={taskEditor?.snapshot ?? null}
+    suggestions={projectSuggestions}
+    onConfirm={confirmTaskEditor}
+    onCancel={cancelTaskEditor}
   />
 </main>
 

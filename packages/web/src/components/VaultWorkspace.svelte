@@ -7,6 +7,7 @@
     OverviewView,
     type ColumnMoveHandler,
     type DayEditOpenHandler,
+    type FullTaskEditHandler,
     type NoteEditHandler,
     type PriorityCycleHandler,
     type ProjectEditOpenHandler,
@@ -43,6 +44,8 @@
     onSectionRename?: SectionRenameHandler;
     /** Slice 6d — opens the library editor modal. `null` ⇒ New File. */
     onLibraryEdit?: (path: string | null) => void;
+    /** Slice 6e — opens the full task editor modal. */
+    onFullTaskEdit?: FullTaskEditHandler;
   }
 
   const {
@@ -62,6 +65,7 @@
     onDayEdit,
     onSectionRename,
     onLibraryEdit,
+    onFullTaskEdit,
   }: Props = $props();
 
   let active = $state<TabKey>('board');
@@ -81,6 +85,7 @@
     ...(onProjectEdit ? { onProjectEdit } : {}),
     ...(onDayEdit ? { onDayEdit } : {}),
     ...(onSectionRename ? { onSectionRename } : {}),
+    ...(onFullTaskEdit ? { onFullTaskEdit } : {}),
   });
   const boardMoveProps = $derived({
     ...(onTaskMove ? { onTaskMove } : {}),

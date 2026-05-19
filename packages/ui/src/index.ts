@@ -27,6 +27,7 @@ export { type ResolveHandler, type ResolveTarget } from './lib/resolve.js';
 export {
   type DayEditOpenHandler,
   type EditTarget,
+  type FullTaskEditHandler,
   type NoteEditHandler,
   type PriorityCycleHandler,
   type ProjectEditOpenHandler,

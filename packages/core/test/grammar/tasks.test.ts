@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { parseTasks, toMarkdown } from '../../src/grammar/tasks.js';
+import { emitTaskBlock, parseTaskBlock, parseTasks, toMarkdown } from '../../src/grammar/tasks.js';
 import type { Task, Vault } from '../../src/grammar/types.js';
 
 const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
@@ -456,5 +456,80 @@ describe('toMarkdown — round-trip invariants (§15.1)', () => {
       const second = toMarkdown(parseTasks(first));
       expect(second).toBe(first);
     });
+  });
+});
+
+describe('emitTaskBlock + parseTaskBlock — single-task round-trip (slice 6e)', () => {
+  it('emits a fully-tokenised task without a trailing newline', () => {
+    const block = emitTaskBlock({
+      id: 'abc12345',
+      checked: false,
+      title: 'Write the spec',
+      note: 'see backlog',
+      priority: 'blocker',
+      project: 'PSD_GAN',
+      day: 'Mon',
+      pomodoros: 2,
+      subtasks: [
+        { text: 'first', checked: false },
+        { text: 'second', checked: true },
+      ],
+    });
+    expect(block.endsWith('\n')).toBe(false);
+    expect(block).toContain('- [ ] **[P0] [project:PSD_GAN] [Mon] [pom:2] Write the spec**');
+    expect(block).toContain(' - see backlog');
+    expect(block).toContain('<!-- id:abc12345 -->');
+    expect(block).toMatch(/^ {2}- \[ \] first$/m);
+    expect(block).toMatch(/^ {2}- \[x\] second$/m);
+  });
+
+  it('round-trips a fully-tokenised task back to itself', () => {
+    const original = {
+      id: 'abc12345',
+      checked: false,
+      title: 'Write the spec',
+      note: 'see backlog',
+      priority: 'blocker' as const,
+      project: 'PSD_GAN',
+      day: 'Mon' as const,
+      pomodoros: 2,
+      subtasks: [
+        { text: 'first', checked: false },
+        { text: 'second', checked: true },
+      ],
+    };
+    const parsed = parseTaskBlock(emitTaskBlock(original));
+    expect(parsed).toEqual(original);
+  });
+
+  it('parses a minimal task block (no tokens, no subtasks)', () => {
+    const parsed = parseTaskBlock('- [ ] Just a title');
+    expect(parsed).not.toBeNull();
+    expect(parsed?.title).toBe('Just a title');
+    expect(parsed?.priority).toBeNull();
+    expect(parsed?.project).toBeNull();
+    expect(parsed?.day).toBeNull();
+    expect(parsed?.pomodoros).toBe(0);
+    expect(parsed?.subtasks).toEqual([]);
+  });
+
+  it('returns null for empty input', () => {
+    expect(parseTaskBlock('')).toBeNull();
+    expect(parseTaskBlock('   \n  ')).toBeNull();
+  });
+
+  it('returns null when no checkbox line is present', () => {
+    expect(parseTaskBlock('just some text')).toBeNull();
+    expect(parseTaskBlock('# A heading\n\nsome text')).toBeNull();
+  });
+
+  it('returns null when input has more than one task', () => {
+    expect(parseTaskBlock('- [ ] First\n- [ ] Second')).toBeNull();
+  });
+
+  it('normalises CRLF input', () => {
+    const parsed = parseTaskBlock('- [ ] Title\r\n  - [ ] Sub');
+    expect(parsed?.title).toBe('Title');
+    expect(parsed?.subtasks).toEqual([{ text: 'Sub', checked: false }]);
   });
 });

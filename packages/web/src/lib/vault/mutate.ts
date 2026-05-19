@@ -7,7 +7,7 @@
 // short-circuit silently if a stale handle / no-op move sneaks through.
 
 import { nextPriority, slugifySection } from '@markdown-board/core';
-import type { Day, Priority, Vault } from '@markdown-board/core';
+import type { Day, Priority, Task, Vault } from '@markdown-board/core';
 
 export interface TaskMove {
   taskId: string;
@@ -184,6 +184,29 @@ export function setTaskDay(vault: Vault, target: TaskTarget, next: Day | null): 
   const task = found && found.tasks[found.idx];
   if (!task) return false;
   task.day = next;
+  return true;
+}
+
+/**
+ * Replace a task in place with the supplied `next`. Preserves the task's
+ * original `id` and `checked` state (the full-edit modal doesn't expose
+ * either — id stays runtime-only per spec §3.15, and checked is gated
+ * through the resolve flow). Used by the slice 6e TaskEditModal "Save"
+ * confirm.
+ *
+ * Returns `false` for a stale target. Mutates the array slot rather
+ * than the task object's fields one-by-one so the deep $state proxy
+ * fires a single reactivity tick instead of N.
+ */
+export function setTask(vault: Vault, target: TaskTarget, next: Task): boolean {
+  const found = findTaskInVault(vault, target);
+  const current = found && found.tasks[found.idx];
+  if (!found || !current) return false;
+  found.tasks[found.idx] = {
+    ...next,
+    id: current.id,
+    checked: current.checked,
+  };
   return true;
 }
 

@@ -35,3 +35,7 @@ export type DayEditOpenHandler = (target: EditTarget, current: Day | null) => vo
 // Slice 6c — section (column) rename. Identifies the section by its
 // runtime id; the new name is the trimmed, non-empty string.
 export type SectionRenameHandler = (sectionId: string, nextName: string) => void;
+
+// Slice 6e — open the full task editor modal. Same target shape as the
+// per-field handlers; the modal carries the rest in its own state.
+export type FullTaskEditHandler = (target: EditTarget) => void;
