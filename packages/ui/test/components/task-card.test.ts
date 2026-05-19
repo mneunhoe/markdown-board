@@ -320,5 +320,32 @@ describe('TaskCard', () => {
       await fireEvent.click(btn!);
       expect(onFullEdit).toHaveBeenCalledOnce();
     });
+
+    it('without onUnresolve, no unresolve (↺) button is rendered', () => {
+      const { container } = render(TaskCard, { task: makeTask() });
+      expect(container.querySelector('[data-testid="task-unresolve"]')).toBeNull();
+    });
+
+    it('with onUnresolve, clicking the ↺ button calls onUnresolve (slice 6g)', async () => {
+      const onUnresolve = vi.fn();
+      const { container } = render(TaskCard, { task: makeTask({ checked: true }), onUnresolve });
+      const btn = container.querySelector<HTMLButtonElement>('[data-testid="task-unresolve"]');
+      expect(btn).toBeTruthy();
+      await fireEvent.click(btn!);
+      expect(onUnresolve).toHaveBeenCalledOnce();
+    });
+
+    it('with only onUnresolve, no delete / pencil / resolve affordances render (archived card path)', () => {
+      const { container } = render(TaskCard, {
+        task: makeTask({ checked: true }),
+        onUnresolve: () => {},
+      });
+      expect(container.querySelector('[data-testid="task-delete"]')).toBeNull();
+      expect(container.querySelector('[data-testid="task-full-edit"]')).toBeNull();
+      expect(container.querySelector('[data-testid="task-unresolve"]')).toBeTruthy();
+      // Checkbox stays presentation-only (no onResolve).
+      const checkbox = container.querySelector<HTMLInputElement>('.card-checkbox');
+      expect(checkbox?.classList.contains('interactive')).toBe(false);
+    });
   });
 });

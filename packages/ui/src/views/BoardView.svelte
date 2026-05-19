@@ -6,6 +6,7 @@
   import type { ColumnMoveHandler, TaskMoveHandler } from '../lib/dnd.js';
   import type { ResolveHandler } from '../lib/resolve.js';
   import type {
+    ArchivedTaskRef,
     DayEditOpenHandler,
     FullTaskEditHandler,
     NoteEditHandler,
@@ -16,6 +17,7 @@
     SubtaskEditHandler,
     SubtaskToggleHandler,
     TaskDeleteHandler,
+    TaskUnresolveHandler,
     TitleEditHandler,
   } from '../lib/edit.js';
   import {
@@ -56,6 +58,17 @@
     onDayEdit?: DayEditOpenHandler;
     onSectionRename?: SectionRenameHandler;
     onFullTaskEdit?: FullTaskEditHandler;
+    /**
+     * Slice 6g — archived tasks grouped by source-section id. Sections
+     * with no archived tasks may be absent from the record. Defaults to
+     * `{}` (no archived rows rendered).
+     */
+    archivedTasksBySection?: Record<string, ArchivedTaskRef[]>;
+    /**
+     * Slice 6g — fires when the user clicks `↺` on an archived card.
+     * Omitted ⇒ archived cards stay fully read-only.
+     */
+    onTaskUnresolve?: TaskUnresolveHandler;
   }
 
   const {
@@ -76,6 +89,8 @@
     onDayEdit,
     onSectionRename,
     onFullTaskEdit,
+    archivedTasksBySection = {},
+    onTaskUnresolve,
   }: Props = $props();
 
   const hasSections = $derived(vault.sections.length > 0);
@@ -106,8 +121,15 @@
         <Column
           name={section.name}
           count={section.tasks.length}
+          archivedTasks={archivedTasksBySection[section.id] ?? []}
           {...onSectionRename
             ? { onRename: (next: string) => onSectionRename(section.id, next) }
+            : {}}
+          {...onTaskUnresolve
+            ? {
+                onUnresolveArchived: (taskId: string) =>
+                  onTaskUnresolve({ taskId, sectionId: section.id }),
+              }
             : {}}
         >
           {#each section.tasks as task, taskIdx (task.id || `${section.id}:${task.title}`)}

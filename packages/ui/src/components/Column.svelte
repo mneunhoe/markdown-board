@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import ArchivedTasksExpander from './ArchivedTasksExpander.svelte';
+  import type { ArchivedTaskRef } from '../lib/edit.js';
 
   interface Props {
     name: string;
@@ -11,9 +13,28 @@
      * `name` is forwarded to the rename handler as the trimmed new value.
      */
     onRename?: (next: string) => void;
+    /**
+     * Slice 6g — archived tasks rendered under this column. Omitted ⇒
+     * the expander is not mounted (no "Archived (0)" affordance). Each
+     * ref carries the H2 timestamp so the expander can subtitle the
+     * row "Archived YYYY-MM-DD HH:MM".
+     */
+    archivedTasks?: ArchivedTaskRef[];
+    /**
+     * Slice 6g — when set, archived TaskCards get the hover-revealed
+     * `↺` button; the host shell moves the task back to active.
+     */
+    onUnresolveArchived?: (taskId: string) => void;
   }
 
-  const { name, count, children, onRename }: Props = $props();
+  const {
+    name,
+    count,
+    children,
+    onRename,
+    archivedTasks = [],
+    onUnresolveArchived,
+  }: Props = $props();
   const renameable = $derived(onRename !== undefined);
 
   let editing = $state(false);
@@ -76,6 +97,10 @@
   </header>
   <div class="cards">
     {@render children?.()}
+    <ArchivedTasksExpander
+      tasks={archivedTasks}
+      {...onUnresolveArchived ? { onUnresolve: onUnresolveArchived } : {}}
+    />
   </div>
 </section>
 

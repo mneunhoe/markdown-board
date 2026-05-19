@@ -33,6 +33,15 @@
     onDayEdit?: () => void;
     /** Slice 6e — pencil button opens the full task-edit modal. */
     onFullEdit?: () => void;
+    /**
+     * Slice 6g — `↺` button on hover. When provided (typically on a
+     * card rendered inside the ArchivedTasksExpander), the host shell
+     * moves the task back from `archive/TASKS.md` into the matching
+     * active section. Mutually exclusive in practice with `onDelete` /
+     * `onFullEdit` (open tasks get edit/delete; archived tasks get
+     * unresolve only).
+     */
+    onUnresolve?: () => void;
   }
 
   const {
@@ -48,6 +57,7 @@
     onProjectEdit,
     onDayEdit,
     onFullEdit,
+    onUnresolve,
   }: Props = $props();
 
   const checkboxInteractive = $derived(onResolve !== undefined);
@@ -58,6 +68,7 @@
   const subtaskToggleable = $derived(onSubtaskToggle !== undefined);
   const deletable = $derived(onDelete !== undefined);
   const fullEditable = $derived(onFullEdit !== undefined);
+  const unresolvable = $derived(onUnresolve !== undefined);
 
   // Inline-edit state. Only one target may be active at a time. The active
   // target is mirrored to the input via bind:value; commit on Enter/blur,
@@ -139,6 +150,16 @@
         title="Edit task…"
         data-testid="task-full-edit"
         onclick={() => onFullEdit?.()}>✎</button
+      >
+    {/if}
+    {#if unresolvable}
+      <button
+        type="button"
+        class="unresolve-btn"
+        aria-label="Unresolve {task.title}"
+        title="Move back to the active list"
+        data-testid="task-unresolve"
+        onclick={() => onUnresolve?.()}>↺</button
       >
     {/if}
     <input
@@ -369,6 +390,33 @@
   }
 
   .full-edit-btn:hover {
+    color: var(--accent);
+  }
+
+  .unresolve-btn {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0;
+    width: 16px;
+    height: 16px;
+    line-height: 1;
+    font-size: 16px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition:
+      opacity 0.1s ease,
+      color 0.1s ease;
+  }
+
+  .task-card:hover .unresolve-btn,
+  .unresolve-btn:focus-visible {
+    opacity: 1;
+  }
+
+  .unresolve-btn:hover {
     color: var(--accent);
   }
 

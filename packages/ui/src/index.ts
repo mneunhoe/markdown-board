@@ -5,6 +5,7 @@ export { default as TaskCard } from './components/TaskCard.svelte';
 export { default as Column } from './components/Column.svelte';
 export { default as EmptyState } from './components/EmptyState.svelte';
 export { default as ModalShell } from './components/ModalShell.svelte';
+export { default as ArchivedTasksExpander } from './components/ArchivedTasksExpander.svelte';
 
 export { default as BoardView } from './views/BoardView.svelte';
 export { default as ListView } from './views/ListView.svelte';
@@ -25,6 +26,7 @@ export {
 } from './lib/dnd.js';
 export { type ResolveHandler, type ResolveTarget } from './lib/resolve.js';
 export {
+  type ArchivedTaskRef,
   type DayEditOpenHandler,
   type EditTarget,
   type FullTaskEditHandler,
@@ -36,5 +38,6 @@ export {
   type SubtaskEditHandler,
   type SubtaskToggleHandler,
   type TaskDeleteHandler,
+  type TaskUnresolveHandler,
   type TitleEditHandler,
 } from './lib/edit.js';

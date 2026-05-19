@@ -91,4 +91,69 @@ describe('Column', () => {
       expect(onRename).not.toHaveBeenCalled();
     });
   });
+
+  describe('archivedTasks (slice 6g)', () => {
+    it('without archivedTasks, no Archived expander is mounted', () => {
+      const { container } = render(Column, { name: 'Active', count: 0 });
+      expect(container.querySelector('[data-testid="archived-expander"]')).toBeNull();
+    });
+
+    it('renders the Archived expander when archivedTasks is non-empty', () => {
+      const { container } = render(Column, {
+        name: 'Active',
+        count: 0,
+        archivedTasks: [
+          {
+            task: {
+              id: 'a',
+              checked: true,
+              title: 'Old',
+              note: '',
+              priority: null,
+              project: null,
+              day: null,
+              pomodoros: 0,
+              subtasks: [],
+            },
+            archivedAt: '2026-05-18 10:00',
+          },
+        ],
+      });
+      const toggle = container.querySelector<HTMLButtonElement>('[data-testid="archived-toggle"]');
+      expect(toggle).toBeTruthy();
+      expect(toggle?.textContent).toContain('Archived (1)');
+    });
+
+    it('forwards onUnresolveArchived to the expander', async () => {
+      const onUnresolveArchived = vi.fn();
+      const { container } = render(Column, {
+        name: 'Active',
+        count: 0,
+        archivedTasks: [
+          {
+            task: {
+              id: 'abc',
+              checked: true,
+              title: 'Old',
+              note: '',
+              priority: null,
+              project: null,
+              day: null,
+              pomodoros: 0,
+              subtasks: [],
+            },
+            archivedAt: '2026-05-18 10:00',
+          },
+        ],
+        onUnresolveArchived,
+      });
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="archived-toggle"]')!,
+      );
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="task-unresolve"]')!,
+      );
+      expect(onUnresolveArchived).toHaveBeenCalledWith('abc');
+    });
+  });
 });

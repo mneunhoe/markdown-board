@@ -1,10 +1,12 @@
 <script lang="ts">
   import type { Vault } from '@markdown-board/core';
+  import ArchivedTasksExpander from '../components/ArchivedTasksExpander.svelte';
   import TaskCard from '../components/TaskCard.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import type { TaskMoveHandler } from '../lib/dnd.js';
   import type { ResolveHandler } from '../lib/resolve.js';
   import type {
+    ArchivedTaskRef,
     DayEditOpenHandler,
     FullTaskEditHandler,
     NoteEditHandler,
@@ -15,6 +17,7 @@
     SubtaskEditHandler,
     SubtaskToggleHandler,
     TaskDeleteHandler,
+    TaskUnresolveHandler,
     TitleEditHandler,
   } from '../lib/edit.js';
   import { columnDropTarget, taskDraggable, taskDropTarget } from '../lib/dnd-actions.js';
@@ -47,6 +50,10 @@
     onDayEdit?: DayEditOpenHandler;
     onSectionRename?: SectionRenameHandler;
     onFullTaskEdit?: FullTaskEditHandler;
+    /** Slice 6g — archived tasks grouped by source-section id. */
+    archivedTasksBySection?: Record<string, ArchivedTaskRef[]>;
+    /** Slice 6g — fires when `↺` is clicked on an archived card. */
+    onTaskUnresolve?: TaskUnresolveHandler;
   }
 
   const {
@@ -66,6 +73,8 @@
     onDayEdit,
     onSectionRename,
     onFullTaskEdit,
+    archivedTasksBySection = {},
+    onTaskUnresolve,
   }: Props = $props();
 
   const hasSections = $derived(vault.sections.length > 0);
@@ -234,6 +243,15 @@
               />
             </div>
           {/each}
+          <ArchivedTasksExpander
+            tasks={archivedTasksBySection[section.id] ?? []}
+            {...onTaskUnresolve
+              ? {
+                  onUnresolve: (taskId: string) =>
+                    onTaskUnresolve({ taskId, sectionId: section.id }),
+                }
+              : {}}
+          />
         </div>
       </section>
     {/each}

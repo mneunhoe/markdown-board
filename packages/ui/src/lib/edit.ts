@@ -12,7 +12,7 @@ export interface EditTarget {
   sectionId: string;
 }
 
-import type { Day } from '@markdown-board/core';
+import type { Day, Task } from '@markdown-board/core';
 
 export type TitleEditHandler = (target: EditTarget, next: string) => void;
 export type NoteEditHandler = (target: EditTarget, next: string) => void;
@@ -39,3 +39,23 @@ export type SectionRenameHandler = (sectionId: string, nextName: string) => void
 // Slice 6e — open the full task editor modal. Same target shape as the
 // per-field handlers; the modal carries the rest in its own state.
 export type FullTaskEditHandler = (target: EditTarget) => void;
+
+// Slice 6g — archived tasks rendered under their source column.
+//
+// `ArchivedTaskRef` pairs a resolved task with its archive H2 timestamp
+// so the expander can subtitle each row "Archived YYYY-MM-DD HH:MM".
+// The source-section grouping (which active column each ref belongs
+// to) happens in the web shell at slice 6g-3; views consume a pre-
+// grouped Record keyed by active-section id.
+export interface ArchivedTaskRef {
+  task: Task;
+  archivedAt: string;
+}
+
+/**
+ * View-level handler fired when the user clicks the `↺` button on an
+ * archived task card. The web shell looks the task up in the archive
+ * vault by id, calls `removeArchivedTask`, re-inserts into the matching
+ * active section, and writes both files.
+ */
+export type TaskUnresolveHandler = (target: EditTarget) => void;
