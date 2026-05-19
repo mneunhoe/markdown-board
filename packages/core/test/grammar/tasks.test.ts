@@ -239,11 +239,9 @@ describe('toMarkdown — canonical §15.1 example', () => {
 describe('toMarkdown — token canonical order', () => {
   it('emits tokens in [P*] [project:Name] [Day] [pom:N] order regardless of input order', () => {
     const shuffled =
-      '## Active\n' +
-      '- [ ] **[Mon] [pom:3] [project:Foo] [P0] Title** <!-- id:0000aaaa -->\n';
+      '## Active\n' + '- [ ] **[Mon] [pom:3] [project:Foo] [P0] Title** <!-- id:0000aaaa -->\n';
     const expected =
-      '## Active\n' +
-      '- [ ] **[P0] [project:Foo] [Mon] [pom:3] Title** <!-- id:0000aaaa -->\n';
+      '## Active\n' + '- [ ] **[P0] [project:Foo] [Mon] [pom:3] Title** <!-- id:0000aaaa -->\n';
     expect(toMarkdown(parseTasks(shuffled))).toBe(expected);
   });
 

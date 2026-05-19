@@ -1,7 +1,17 @@
 import type { Task, Vault } from '@markdown-board/core';
 import { describe, expect, it } from 'vitest';
 
-import { ensureUniqueTaskIds, moveColumn, moveTask } from '../../../src/lib/vault/mutate.js';
+import {
+  addSubtask,
+  deleteTask,
+  ensureUniqueTaskIds,
+  moveColumn,
+  moveTask,
+  setSubtaskText,
+  setTaskNote,
+  setTaskTitle,
+  toggleSubtask,
+} from '../../../src/lib/vault/mutate.js';
 
 function task(id: string, title: string): Task {
   return {
@@ -173,5 +183,116 @@ describe('ensureUniqueTaskIds', () => {
     ensureUniqueTaskIds(v);
     const ids = v.sections.flatMap((s) => s.tasks.map((t) => t.id));
     expect(new Set(ids).size).toBe(3);
+  });
+});
+
+describe('setTaskTitle', () => {
+  it('mutates the title in place', () => {
+    const v = vault();
+    const ok = setTaskTitle(v, { taskId: 'a', sectionId: 'active' }, 'Renamed');
+    expect(ok).toBe(true);
+    expect(v.sections[0]?.tasks[0]?.title).toBe('Renamed');
+  });
+
+  it('returns false when the task is unknown', () => {
+    const v = vault();
+    expect(setTaskTitle(v, { taskId: 'nope', sectionId: 'active' }, 'X')).toBe(false);
+  });
+
+  it('returns false when the section is unknown', () => {
+    const v = vault();
+    expect(setTaskTitle(v, { taskId: 'a', sectionId: 'ghost' }, 'X')).toBe(false);
+  });
+});
+
+describe('setTaskNote', () => {
+  it('sets the note', () => {
+    const v = vault();
+    setTaskNote(v, { taskId: 'a', sectionId: 'active' }, 'see backlog');
+    expect(v.sections[0]?.tasks[0]?.note).toBe('see backlog');
+  });
+
+  it('clears the note when next is empty (prototype parity)', () => {
+    const v = vault();
+    setTaskNote(v, { taskId: 'a', sectionId: 'active' }, 'temp');
+    setTaskNote(v, { taskId: 'a', sectionId: 'active' }, '');
+    expect(v.sections[0]?.tasks[0]?.note).toBe('');
+  });
+});
+
+describe('deleteTask', () => {
+  it('removes the task from its section', () => {
+    const v = vault();
+    const ok = deleteTask(v, { taskId: 'a', sectionId: 'active' });
+    expect(ok).toBe(true);
+    expect(v.sections[0]?.tasks.map((t) => t.id)).toEqual(['b']);
+  });
+
+  it('returns false for a stale target', () => {
+    const v = vault();
+    expect(deleteTask(v, { taskId: 'ghost', sectionId: 'active' })).toBe(false);
+    expect(v.sections[0]?.tasks).toHaveLength(2);
+  });
+});
+
+describe('setSubtaskText', () => {
+  function vaultWithSubs() {
+    const v = vault();
+    const t = v.sections[0]?.tasks[0];
+    if (!t) throw new Error();
+    t.subtasks = [
+      { text: 'first', checked: false },
+      { text: 'second', checked: true },
+    ];
+    return v;
+  }
+
+  it('updates the subtask text', () => {
+    const v = vaultWithSubs();
+    setSubtaskText(v, { taskId: 'a', sectionId: 'active' }, 0, 'updated');
+    expect(v.sections[0]?.tasks[0]?.subtasks[0]?.text).toBe('updated');
+  });
+
+  it('deletes the subtask when next is empty (prototype parity, line 3105)', () => {
+    const v = vaultWithSubs();
+    setSubtaskText(v, { taskId: 'a', sectionId: 'active' }, 0, '');
+    expect(v.sections[0]?.tasks[0]?.subtasks.map((s) => s.text)).toEqual(['second']);
+  });
+
+  it('returns false for an out-of-range index', () => {
+    const v = vaultWithSubs();
+    expect(setSubtaskText(v, { taskId: 'a', sectionId: 'active' }, 99, 'x')).toBe(false);
+  });
+});
+
+describe('toggleSubtask', () => {
+  it('flips the checked state', () => {
+    const v = vault();
+    const t = v.sections[0]?.tasks[0];
+    if (!t) throw new Error();
+    t.subtasks = [{ text: 'one', checked: false }];
+    toggleSubtask(v, { taskId: 'a', sectionId: 'active' }, 0);
+    expect(t.subtasks[0]?.checked).toBe(true);
+    toggleSubtask(v, { taskId: 'a', sectionId: 'active' }, 0);
+    expect(t.subtasks[0]?.checked).toBe(false);
+  });
+
+  it('returns false for an out-of-range index', () => {
+    const v = vault();
+    expect(toggleSubtask(v, { taskId: 'a', sectionId: 'active' }, 0)).toBe(false);
+  });
+});
+
+describe('addSubtask', () => {
+  it('appends an unchecked subtask', () => {
+    const v = vault();
+    addSubtask(v, { taskId: 'a', sectionId: 'active' }, 'new');
+    expect(v.sections[0]?.tasks[0]?.subtasks).toEqual([{ text: 'new', checked: false }]);
+  });
+
+  it('returns false (and does not add) for an empty string', () => {
+    const v = vault();
+    expect(addSubtask(v, { taskId: 'a', sectionId: 'active' }, '')).toBe(false);
+    expect(v.sections[0]?.tasks[0]?.subtasks).toHaveLength(0);
   });
 });

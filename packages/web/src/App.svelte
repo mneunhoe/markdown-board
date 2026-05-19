@@ -4,8 +4,14 @@
   import {
     EmptyState,
     type ColumnMoveHandler,
+    type NoteEditHandler,
     type ResolveHandler,
+    type SubtaskAddHandler,
+    type SubtaskEditHandler,
+    type SubtaskToggleHandler,
+    type TaskDeleteHandler,
     type TaskMoveHandler,
+    type TitleEditHandler,
   } from '@markdown-board/ui';
   import { FSAFileAdapter } from './lib/adapters/index.js';
   import ResolveModal from './components/ResolveModal.svelte';
@@ -17,7 +23,9 @@
     ExternalChangeWatcher,
     FileSystemAccessUnsupportedError,
     VaultPickerCancelledError,
+    addSubtask,
     appendArchiveEntry,
+    deleteTask,
     findTask,
     isFileSystemAccessSupported,
     loadVault,
@@ -25,6 +33,10 @@
     moveTask,
     pickVaultDirectory,
     removeTask,
+    setSubtaskText,
+    setTaskNote,
+    setTaskTitle,
+    toggleSubtask,
     type LoadedVault,
   } from './lib/vault/index.js';
 
@@ -135,6 +147,36 @@
     resolveTarget = found;
   };
 
+  const onTitleEdit: TitleEditHandler = (target, next) => {
+    if (!loaded) return;
+    setTaskTitle(loaded.vault, target, next);
+  };
+
+  const onNoteEdit: NoteEditHandler = (target, next) => {
+    if (!loaded) return;
+    setTaskNote(loaded.vault, target, next);
+  };
+
+  const onSubtaskEdit: SubtaskEditHandler = (target, idx, next) => {
+    if (!loaded) return;
+    setSubtaskText(loaded.vault, target, idx, next);
+  };
+
+  const onSubtaskAdd: SubtaskAddHandler = (target, text) => {
+    if (!loaded) return;
+    addSubtask(loaded.vault, target, text);
+  };
+
+  const onSubtaskToggle: SubtaskToggleHandler = (target, idx) => {
+    if (!loaded) return;
+    toggleSubtask(loaded.vault, target, idx);
+  };
+
+  const onTaskDelete: TaskDeleteHandler = (target) => {
+    if (!loaded) return;
+    deleteTask(loaded.vault, target);
+  };
+
   async function confirmResolve(resolution: string): Promise<void> {
     if (!resolveTarget || !adapter || !loaded || resolving) return;
     const { task, section } = resolveTarget;
@@ -167,11 +209,19 @@
   // Autosave $effect — re-runs on any deep mutation of `loaded.vault`
   // (Svelte 5's proxy traverses sections/tasks). Schedules a write when
   // the canonical markdown drifts from what we last wrote.
+  //
+  // IMPORTANT: read the deep dependencies (loaded.vault via toMarkdown)
+  // *before* checking `autosaver`. `autosaver` is a plain `let`, not
+  // $state — if we short-circuit on `!autosaver` first, the effect's
+  // tracked deps never include `loaded.vault.sections[*].tasks[*]`, so
+  // subsequent mutations don't re-run the effect. This bit slice 6a's
+  // first end-to-end autosave test: handlers ran, mutations landed in
+  // memory, but the disk file was never rewritten.
   $effect(() => {
-    if (!loaded || !autosaver) return;
+    if (!loaded) return;
     const md = toMarkdown(loaded.vault);
     if (md === lastWrittenMd) return;
-    autosaver.schedule(md);
+    autosaver?.schedule(md);
   });
 
   $effect(() => {
@@ -214,6 +264,12 @@
         {onTaskMove}
         {onColumnMove}
         {onResolve}
+        {onTitleEdit}
+        {onNoteEdit}
+        {onSubtaskEdit}
+        {onSubtaskAdd}
+        {onSubtaskToggle}
+        {onTaskDelete}
       />
     {:else if !supported}
       <EmptyState

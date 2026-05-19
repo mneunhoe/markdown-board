@@ -24,3 +24,12 @@ export {
   isTaskDragData,
 } from './lib/dnd.js';
 export { type ResolveHandler, type ResolveTarget } from './lib/resolve.js';
+export {
+  type EditTarget,
+  type NoteEditHandler,
+  type SubtaskAddHandler,
+  type SubtaskEditHandler,
+  type SubtaskToggleHandler,
+  type TaskDeleteHandler,
+  type TitleEditHandler,
+} from './lib/edit.js';

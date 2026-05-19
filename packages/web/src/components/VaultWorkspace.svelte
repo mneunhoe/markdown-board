@@ -6,8 +6,14 @@
     ListView,
     OverviewView,
     type ColumnMoveHandler,
+    type NoteEditHandler,
     type ResolveHandler,
+    type SubtaskAddHandler,
+    type SubtaskEditHandler,
+    type SubtaskToggleHandler,
+    type TaskDeleteHandler,
     type TaskMoveHandler,
+    type TitleEditHandler,
   } from '@markdown-board/ui';
   import TabBar from './TabBar.svelte';
   import type { TabKey } from '../lib/tabs.js';
@@ -20,24 +26,53 @@
     onColumnMove?: ColumnMoveHandler;
     /** Opens the resolve modal in App.svelte. Omitted ⇒ checkboxes presentation-only. */
     onResolve?: ResolveHandler;
+    /** Inline-edit handlers (slice 6a). Omitted ⇒ edit affordances hidden. */
+    onTitleEdit?: TitleEditHandler;
+    onNoteEdit?: NoteEditHandler;
+    onSubtaskEdit?: SubtaskEditHandler;
+    onSubtaskAdd?: SubtaskAddHandler;
+    onSubtaskToggle?: SubtaskToggleHandler;
+    onTaskDelete?: TaskDeleteHandler;
   }
 
-  const { vault, libraryDocs, onTaskMove, onColumnMove, onResolve }: Props = $props();
+  const {
+    vault,
+    libraryDocs,
+    onTaskMove,
+    onColumnMove,
+    onResolve,
+    onTitleEdit,
+    onNoteEdit,
+    onSubtaskEdit,
+    onSubtaskAdd,
+    onSubtaskToggle,
+    onTaskDelete,
+  }: Props = $props();
 
   let active = $state<TabKey>('board');
 
   // Conditionally-keyed prop bags so an undefined handler is *absent*
   // rather than passed as `undefined` — required under
   // `exactOptionalPropertyTypes` since BoardView / ListView declare
-  // their move / resolve props as `?: T`.
+  // their move / resolve / edit props as `?: T`.
+  const editProps = $derived({
+    ...(onTitleEdit ? { onTitleEdit } : {}),
+    ...(onNoteEdit ? { onNoteEdit } : {}),
+    ...(onSubtaskEdit ? { onSubtaskEdit } : {}),
+    ...(onSubtaskAdd ? { onSubtaskAdd } : {}),
+    ...(onSubtaskToggle ? { onSubtaskToggle } : {}),
+    ...(onTaskDelete ? { onTaskDelete } : {}),
+  });
   const boardMoveProps = $derived({
     ...(onTaskMove ? { onTaskMove } : {}),
     ...(onColumnMove ? { onColumnMove } : {}),
     ...(onResolve ? { onResolve } : {}),
+    ...editProps,
   });
   const listMoveProps = $derived({
     ...(onTaskMove ? { onTaskMove } : {}),
     ...(onResolve ? { onResolve } : {}),
+    ...editProps,
   });
 </script>
 

@@ -75,3 +75,81 @@ function mintId(): string {
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
+
+export interface TaskTarget {
+  taskId: string;
+  sectionId: string;
+}
+
+function findTaskInVault(
+  vault: Vault,
+  target: TaskTarget,
+): { tasks: Vault['sections'][number]['tasks']; idx: number } | null {
+  const section = vault.sections.find((s) => s.id === target.sectionId);
+  if (!section) return null;
+  const idx = section.tasks.findIndex((t) => t.id === target.taskId);
+  if (idx === -1) return null;
+  return { tasks: section.tasks, idx };
+}
+
+export function setTaskTitle(vault: Vault, target: TaskTarget, next: string): boolean {
+  const found = findTaskInVault(vault, target);
+  const task = found && found.tasks[found.idx];
+  if (!task) return false;
+  task.title = next;
+  return true;
+}
+
+export function setTaskNote(vault: Vault, target: TaskTarget, next: string): boolean {
+  const found = findTaskInVault(vault, target);
+  const task = found && found.tasks[found.idx];
+  if (!task) return false;
+  task.note = next;
+  return true;
+}
+
+export function deleteTask(vault: Vault, target: TaskTarget): boolean {
+  const found = findTaskInVault(vault, target);
+  if (!found) return false;
+  found.tasks.splice(found.idx, 1);
+  return true;
+}
+
+export function setSubtaskText(
+  vault: Vault,
+  target: TaskTarget,
+  idx: number,
+  next: string,
+): boolean {
+  const found = findTaskInVault(vault, target);
+  const task = found && found.tasks[found.idx];
+  if (!task) return false;
+  if (idx < 0 || idx >= task.subtasks.length) return false;
+  if (next === '') {
+    task.subtasks.splice(idx, 1);
+    return true;
+  }
+  const subtask = task.subtasks[idx];
+  if (!subtask) return false;
+  subtask.text = next;
+  return true;
+}
+
+export function toggleSubtask(vault: Vault, target: TaskTarget, idx: number): boolean {
+  const found = findTaskInVault(vault, target);
+  const task = found && found.tasks[found.idx];
+  if (!task) return false;
+  const subtask = task.subtasks[idx];
+  if (!subtask) return false;
+  subtask.checked = !subtask.checked;
+  return true;
+}
+
+export function addSubtask(vault: Vault, target: TaskTarget, text: string): boolean {
+  const found = findTaskInVault(vault, target);
+  const task = found && found.tasks[found.idx];
+  if (!task) return false;
+  if (!text) return false;
+  task.subtasks.push({ text, checked: false });
+  return true;
+}

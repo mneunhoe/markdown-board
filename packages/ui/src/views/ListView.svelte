@@ -4,6 +4,14 @@
   import EmptyState from '../components/EmptyState.svelte';
   import type { TaskMoveHandler } from '../lib/dnd.js';
   import type { ResolveHandler } from '../lib/resolve.js';
+  import type {
+    NoteEditHandler,
+    SubtaskAddHandler,
+    SubtaskEditHandler,
+    SubtaskToggleHandler,
+    TaskDeleteHandler,
+    TitleEditHandler,
+  } from '../lib/edit.js';
   import { columnDropTarget, taskDraggable, taskDropTarget } from '../lib/dnd-actions.js';
 
   interface Props {
@@ -22,6 +30,13 @@
      * here.
      */
     onResolve?: ResolveHandler;
+    /** Inline-edit handlers (slice 6a). Omitted ⇒ edit affordances hidden. */
+    onTitleEdit?: TitleEditHandler;
+    onNoteEdit?: NoteEditHandler;
+    onSubtaskEdit?: SubtaskEditHandler;
+    onSubtaskAdd?: SubtaskAddHandler;
+    onSubtaskToggle?: SubtaskToggleHandler;
+    onTaskDelete?: TaskDeleteHandler;
   }
 
   const {
@@ -30,6 +45,12 @@
     emptyHint = 'Add a `- [ ]` line under any H2 heading in TASKS.md.',
     onTaskMove,
     onResolve,
+    onTitleEdit,
+    onNoteEdit,
+    onSubtaskEdit,
+    onSubtaskAdd,
+    onSubtaskToggle,
+    onTaskDelete,
   }: Props = $props();
 
   const hasSections = $derived(vault.sections.length > 0);
@@ -79,6 +100,41 @@
                 {task}
                 {...onResolve
                   ? { onResolve: () => onResolve({ taskId: task.id, sectionId: section.id }) }
+                  : {}}
+                {...onTitleEdit
+                  ? {
+                      onTitleEdit: (next: string) =>
+                        onTitleEdit({ taskId: task.id, sectionId: section.id }, next),
+                    }
+                  : {}}
+                {...onNoteEdit
+                  ? {
+                      onNoteEdit: (next: string) =>
+                        onNoteEdit({ taskId: task.id, sectionId: section.id }, next),
+                    }
+                  : {}}
+                {...onSubtaskEdit
+                  ? {
+                      onSubtaskEdit: (idx: number, next: string) =>
+                        onSubtaskEdit({ taskId: task.id, sectionId: section.id }, idx, next),
+                    }
+                  : {}}
+                {...onSubtaskAdd
+                  ? {
+                      onSubtaskAdd: (text: string) =>
+                        onSubtaskAdd({ taskId: task.id, sectionId: section.id }, text),
+                    }
+                  : {}}
+                {...onSubtaskToggle
+                  ? {
+                      onSubtaskToggle: (idx: number) =>
+                        onSubtaskToggle({ taskId: task.id, sectionId: section.id }, idx),
+                    }
+                  : {}}
+                {...onTaskDelete
+                  ? {
+                      onDelete: () => onTaskDelete({ taskId: task.id, sectionId: section.id }),
+                    }
                   : {}}
               />
             </div>

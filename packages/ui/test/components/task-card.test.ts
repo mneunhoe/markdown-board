@@ -148,4 +148,163 @@ describe('TaskCard', () => {
       expect(onResolve).toHaveBeenCalledOnce();
     });
   });
+
+  describe('editor mode (slice 6a)', () => {
+    it('without onTitleEdit, the title is a plain non-button element', () => {
+      const { container } = render(TaskCard, { task: makeTask() });
+      expect(container.querySelector('button.card-title')).toBeNull();
+      expect(container.querySelector('div.card-title')).toBeTruthy();
+    });
+
+    it('with onTitleEdit, clicking the title swaps in an input', async () => {
+      const onTitleEdit = vi.fn();
+      const { container } = render(TaskCard, { task: makeTask(), onTitleEdit });
+      const titleBtn = container.querySelector<HTMLButtonElement>('button.card-title');
+      expect(titleBtn).toBeTruthy();
+      await fireEvent.click(titleBtn!);
+      expect(container.querySelector('[data-testid="task-title-input"]')).toBeTruthy();
+    });
+
+    it('committing a title edit (Enter) calls onTitleEdit with the trimmed value', async () => {
+      const onTitleEdit = vi.fn();
+      const { container } = render(TaskCard, { task: makeTask(), onTitleEdit });
+      await fireEvent.click(container.querySelector<HTMLButtonElement>('button.card-title')!);
+      const input = container.querySelector<HTMLInputElement>('[data-testid="task-title-input"]');
+      await fireEvent.input(input!, { target: { value: '  Renamed  ' } });
+      await fireEvent.keyDown(input!, { key: 'Enter' });
+      expect(onTitleEdit).toHaveBeenCalledWith('Renamed');
+    });
+
+    it('Escape during title edit reverts without calling onTitleEdit', async () => {
+      const onTitleEdit = vi.fn();
+      const { container } = render(TaskCard, { task: makeTask(), onTitleEdit });
+      await fireEvent.click(container.querySelector<HTMLButtonElement>('button.card-title')!);
+      const input = container.querySelector<HTMLInputElement>('[data-testid="task-title-input"]');
+      await fireEvent.input(input!, { target: { value: 'discarded' } });
+      await fireEvent.keyDown(input!, { key: 'Escape' });
+      expect(onTitleEdit).not.toHaveBeenCalled();
+      expect(container.querySelector('[data-testid="task-title-input"]')).toBeNull();
+    });
+
+    it('blank title commits do not fire the handler (prototype parity, line 3050)', async () => {
+      const onTitleEdit = vi.fn();
+      const { container } = render(TaskCard, { task: makeTask(), onTitleEdit });
+      await fireEvent.click(container.querySelector<HTMLButtonElement>('button.card-title')!);
+      const input = container.querySelector<HTMLInputElement>('[data-testid="task-title-input"]');
+      await fireEvent.input(input!, { target: { value: '   ' } });
+      await fireEvent.keyDown(input!, { key: 'Enter' });
+      expect(onTitleEdit).not.toHaveBeenCalled();
+    });
+
+    it('with onNoteEdit and no note, shows the "+ Add note" affordance', () => {
+      const { container } = render(TaskCard, {
+        task: makeTask({ note: '' }),
+        onNoteEdit: vi.fn(),
+      });
+      expect(container.querySelector('[data-testid="task-note-add"]')).toBeTruthy();
+    });
+
+    it('without onNoteEdit and no note, hides the "+ Add note" affordance', () => {
+      const { container } = render(TaskCard, { task: makeTask({ note: '' }) });
+      expect(container.querySelector('[data-testid="task-note-add"]')).toBeNull();
+    });
+
+    it('committing a note edit with an empty string clears the note', async () => {
+      const onNoteEdit = vi.fn();
+      const { container } = render(TaskCard, {
+        task: makeTask({ note: 'old' }),
+        onNoteEdit,
+      });
+      const noteBtn = container.querySelector<HTMLButtonElement>('button.card-note');
+      await fireEvent.click(noteBtn!);
+      const input = container.querySelector<HTMLInputElement>('[data-testid="task-note-input"]');
+      await fireEvent.input(input!, { target: { value: '' } });
+      await fireEvent.keyDown(input!, { key: 'Enter' });
+      expect(onNoteEdit).toHaveBeenCalledWith('');
+    });
+
+    it('without onDelete, no delete button is rendered', () => {
+      const { container } = render(TaskCard, { task: makeTask() });
+      expect(container.querySelector('[data-testid="task-delete"]')).toBeNull();
+    });
+
+    it('with onDelete, clicking the delete button calls onDelete', async () => {
+      const onDelete = vi.fn();
+      const { container } = render(TaskCard, { task: makeTask(), onDelete });
+      const btn = container.querySelector<HTMLButtonElement>('[data-testid="task-delete"]');
+      await fireEvent.click(btn!);
+      expect(onDelete).toHaveBeenCalledOnce();
+    });
+
+    it('with onSubtaskAdd, shows the "+ Add subtask" affordance even when there are no subtasks', () => {
+      const { container } = render(TaskCard, {
+        task: makeTask({ subtasks: [] }),
+        onSubtaskAdd: vi.fn(),
+      });
+      expect(container.querySelector('[data-testid="subtask-add"]')).toBeTruthy();
+    });
+
+    it('committing "+ Add subtask" appends a new subtask via onSubtaskAdd', async () => {
+      const onSubtaskAdd = vi.fn();
+      const { container } = render(TaskCard, {
+        task: makeTask({ subtasks: [] }),
+        onSubtaskAdd,
+      });
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="subtask-add"]')!,
+      );
+      const input = container.querySelector<HTMLInputElement>('[data-testid="subtask-add-input"]');
+      await fireEvent.input(input!, { target: { value: 'fresh sub' } });
+      await fireEvent.keyDown(input!, { key: 'Enter' });
+      expect(onSubtaskAdd).toHaveBeenCalledWith('fresh sub');
+    });
+
+    it('with onSubtaskEdit, clicking a subtask text swaps in an input', async () => {
+      const onSubtaskEdit = vi.fn();
+      const { container } = render(TaskCard, {
+        task: makeTask({ subtasks: [{ text: 'first', checked: false }] }),
+        onSubtaskEdit,
+      });
+      const btn = container.querySelector<HTMLButtonElement>('[data-testid="subtask-text-0"]');
+      await fireEvent.click(btn!);
+      const input = container.querySelector<HTMLInputElement>('[data-testid="subtask-input"]');
+      expect(input).toBeTruthy();
+      await fireEvent.input(input!, { target: { value: 'updated' } });
+      await fireEvent.keyDown(input!, { key: 'Enter' });
+      expect(onSubtaskEdit).toHaveBeenCalledWith(0, 'updated');
+    });
+
+    it('committing a subtask edit with empty value calls onSubtaskEdit with "" (delete signal)', async () => {
+      const onSubtaskEdit = vi.fn();
+      const { container } = render(TaskCard, {
+        task: makeTask({ subtasks: [{ text: 'first', checked: false }] }),
+        onSubtaskEdit,
+      });
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="subtask-text-0"]')!,
+      );
+      const input = container.querySelector<HTMLInputElement>('[data-testid="subtask-input"]');
+      await fireEvent.input(input!, { target: { value: '' } });
+      await fireEvent.keyDown(input!, { key: 'Enter' });
+      expect(onSubtaskEdit).toHaveBeenCalledWith(0, '');
+    });
+
+    it('with onSubtaskToggle, clicking a subtask checkbox calls onSubtaskToggle', async () => {
+      const onSubtaskToggle = vi.fn();
+      const { container } = render(TaskCard, {
+        task: makeTask({
+          subtasks: [
+            { text: 'one', checked: false },
+            { text: 'two', checked: false },
+          ],
+        }),
+        onSubtaskToggle,
+      });
+      const cbs = container.querySelectorAll<HTMLInputElement>(
+        '[data-testid^="subtask-checkbox-"]',
+      );
+      await fireEvent.click(cbs[1]!);
+      expect(onSubtaskToggle).toHaveBeenCalledWith(1);
+    });
+  });
 });

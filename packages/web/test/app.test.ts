@@ -149,5 +149,43 @@ describe('App (web shell)', () => {
     // gesture path requires pragmatic-dnd's real DOM event sequence,
     // which happy-dom can't replay faithfully. Slice 5 will add a
     // Playwright suite that drives the full UI in a real browser.
+
+    it('inline-editing a title autosaves through to TASKS.md (slice 6a)', async () => {
+      const root = seedVault({ 'TASKS.md': '## Active\n- [ ] Old\n' });
+      installPicker(root);
+      const { container } = render(App);
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+      );
+      await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+
+      const titleBtn = container.querySelector<HTMLButtonElement>('[data-testid="task-title"]');
+      expect(titleBtn).toBeTruthy();
+      await fireEvent.click(titleBtn!);
+      const input = container.querySelector<HTMLInputElement>('[data-testid="task-title-input"]');
+      await fireEvent.input(input!, { target: { value: 'New title' } });
+      await fireEvent.keyDown(input!, { key: 'Enter' });
+      // Wait for the 500 ms autosave debounce + write microtask.
+      await new Promise((r) => setTimeout(r, 800));
+      expect(root.readSync('TASKS.md')).toContain('New title');
+      expect(root.readSync('TASKS.md')).not.toContain('Old');
+    });
+
+    it('deleting a task autosaves the removal to TASKS.md (slice 6a)', async () => {
+      const root = seedVault({ 'TASKS.md': '## Active\n- [ ] Goodbye\n- [ ] Stays\n' });
+      installPicker(root);
+      const { container } = render(App);
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+      );
+      await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+
+      const delBtn = container.querySelector<HTMLButtonElement>('[data-testid="task-delete"]');
+      expect(delBtn).toBeTruthy();
+      await fireEvent.click(delBtn!);
+      await new Promise((r) => setTimeout(r, 800));
+      expect(root.readSync('TASKS.md')).not.toContain('Goodbye');
+      expect(root.readSync('TASKS.md')).toContain('Stays');
+    });
   });
 });
