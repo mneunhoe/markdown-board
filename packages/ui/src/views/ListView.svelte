@@ -2,26 +2,47 @@
   import type { Vault } from '@markdown-board/core';
   import TaskCard from '../components/TaskCard.svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import type { TaskMoveHandler } from '../lib/dnd.js';
+  import { columnDropTarget, taskDraggable, taskDropTarget } from '../lib/dnd-actions.js';
 
   interface Props {
     vault: Vault;
     emptyTitle?: string;
     emptyHint?: string;
+    /**
+     * Called when a task is reordered or moved between sections. When omitted,
+     * the view stays presentation-only — no `draggable` attributes, no DnD
+     * listeners. Column reorder is BoardView-only and not exposed here.
+     */
+    onTaskMove?: TaskMoveHandler;
   }
 
   const {
     vault,
     emptyTitle = 'No tasks yet',
     emptyHint = 'Add a `- [ ]` line under any H2 heading in TASKS.md.',
+    onTaskMove,
   }: Props = $props();
 
   const hasSections = $derived(vault.sections.length > 0);
+  const taskDndEnabled = $derived(onTaskMove !== undefined);
 </script>
 
 {#if hasSections}
   <div class="list-view">
-    {#each vault.sections as section (section.id)}
-      <section class="list-section" data-section-id={section.id}>
+    {#each vault.sections as section, sectionIdx (section.id)}
+      <section
+        class="list-section"
+        data-section-id={section.id}
+        use:columnDropTarget={{
+          sectionId: section.id,
+          index: sectionIdx,
+          taskCount: section.tasks.length,
+          enabled: taskDndEnabled,
+          onTaskMove,
+          onColumnMove: undefined,
+        }}
+      >
         <header class="list-section-header">
           <span class="section-title">{section.name}</span>
           <span class="count" aria-label="{section.tasks.length} tasks">
@@ -29,8 +50,25 @@
           </span>
         </header>
         <div class="list-tasks">
-          {#each section.tasks as task (task.id || `${section.id}:${task.title}`)}
-            <TaskCard {task} />
+          {#each section.tasks as task, taskIdx (task.id || `${section.id}:${task.title}`)}
+            <div
+              class="list-task-slot"
+              use:taskDraggable={{
+                taskId: task.id,
+                sectionId: section.id,
+                index: taskIdx,
+                enabled: taskDndEnabled,
+              }}
+              use:taskDropTarget={{
+                taskId: task.id,
+                sectionId: section.id,
+                index: taskIdx,
+                enabled: taskDndEnabled,
+                onTaskMove,
+              }}
+            >
+              <TaskCard {task} />
+            </div>
           {/each}
         </div>
       </section>
@@ -87,5 +125,34 @@
   .list-tasks {
     display: flex;
     flex-direction: column;
+  }
+
+  .list-task-slot {
+    position: relative;
+  }
+
+  /* See BoardView.svelte for the rationale: pragmatic-dnd toggles these
+     attributes at runtime, so we opt the attribute selectors out of
+     Svelte's compile-time CSS pruning via :global(). */
+  :global(.list-task-slot[data-dragging='true']) {
+    opacity: 0.5;
+  }
+
+  :global(.list-task-slot[data-drop-edge='top']::before),
+  :global(.list-task-slot[data-drop-edge='bottom']::before) {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--accent);
+    border-radius: 2px;
+    pointer-events: none;
+  }
+  :global(.list-task-slot[data-drop-edge='top']::before) {
+    top: -5px;
+  }
+  :global(.list-task-slot[data-drop-edge='bottom']::before) {
+    bottom: 5px;
   }
 </style>

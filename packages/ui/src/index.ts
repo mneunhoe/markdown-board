@@ -12,3 +12,14 @@ export { default as LibraryView } from './views/LibraryView.svelte';
 export { default as OverviewView } from './views/OverviewView.svelte';
 
 export { projectShort, projectColor } from './lib/project.js';
+export {
+  type ColumnDragData,
+  type ColumnMoveHandler,
+  type Edge,
+  type TaskDragData,
+  type TaskMoveHandler,
+  computeAppendIndex,
+  computeReorderIndex,
+  isColumnDragData,
+  isTaskDragData,
+} from './lib/dnd.js';

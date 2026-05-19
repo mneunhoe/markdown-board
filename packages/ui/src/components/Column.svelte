@@ -11,7 +11,7 @@
 </script>
 
 <section class="column" aria-label="Section {name}">
-  <header class="column-header">
+  <header class="column-header" data-column-drag-handle>
     <span class="column-title">{name}</span>
     <span class="count" aria-label="{count} tasks">{count}</span>
   </header>
