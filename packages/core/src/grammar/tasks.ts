@@ -17,7 +17,17 @@ const DAY_RE =
   /^\s*\[\s*(mon(?:day)?|tue(?:s|sday)?|wed(?:s|nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\s*\]\s+(.+)$/i;
 const POM_RE = /^\s*\[\s*pom:\s*(\d+)\s*\]\s+(.+)$/i;
 
-function slugifySection(name: string): string {
+/**
+ * Compute a section's runtime id from its display name. Lowercases,
+ * collapses runs of non-alphanumerics into a single dash, and trims
+ * leading / trailing dashes. Mirrors `taskSectionId` in
+ * `dashboard.html:1880-1885`.
+ *
+ * Exported for the web shell so the section-rename handler can refresh
+ * a column's id when its name changes (slice 6c) without re-parsing
+ * the entire vault.
+ */
+export function slugifySection(name: string): string {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')

@@ -6,7 +6,7 @@
 // Returns `boolean` (rather than throwing) so the autosave $effect can
 // short-circuit silently if a stale handle / no-op move sneaks through.
 
-import { nextPriority } from '@markdown-board/core';
+import { nextPriority, slugifySection } from '@markdown-board/core';
 import type { Day, Priority, Vault } from '@markdown-board/core';
 
 export interface TaskMove {
@@ -184,6 +184,31 @@ export function setTaskDay(vault: Vault, target: TaskTarget, next: Day | null): 
   const task = found && found.tasks[found.idx];
   if (!task) return false;
   task.day = next;
+  return true;
+}
+
+/**
+ * Rename a section by id. Updates both `name` and (when the new slug
+ * differs) the runtime `id`, mirroring `dashboard.html:3162-3171`. The
+ * id sync keeps DnD targets and column lookups consistent with what a
+ * fresh `parseTasks` of the next autosave output would produce.
+ *
+ * Returns `false` when the target section is unknown OR when the
+ * proposed name would collide with another section's id (the caller
+ * can surface the rejection in the UI; the in-memory vault is left
+ * unchanged).
+ */
+export function renameSection(vault: Vault, sectionId: string, nextName: string): boolean {
+  const trimmed = nextName.trim();
+  if (!trimmed) return false;
+  const section = vault.sections.find((s) => s.id === sectionId);
+  if (!section) return false;
+  const newId = slugifySection(trimmed);
+  if (newId !== sectionId && vault.sections.some((s) => s.id === newId)) {
+    return false;
+  }
+  section.name = trimmed;
+  section.id = newId;
   return true;
 }
 

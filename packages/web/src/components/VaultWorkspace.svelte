@@ -11,6 +11,7 @@
     type PriorityCycleHandler,
     type ProjectEditOpenHandler,
     type ResolveHandler,
+    type SectionRenameHandler,
     type SubtaskAddHandler,
     type SubtaskEditHandler,
     type SubtaskToggleHandler,
@@ -39,6 +40,7 @@
     onPriorityCycle?: PriorityCycleHandler;
     onProjectEdit?: ProjectEditOpenHandler;
     onDayEdit?: DayEditOpenHandler;
+    onSectionRename?: SectionRenameHandler;
   }
 
   const {
@@ -56,6 +58,7 @@
     onPriorityCycle,
     onProjectEdit,
     onDayEdit,
+    onSectionRename,
   }: Props = $props();
 
   let active = $state<TabKey>('board');
@@ -74,6 +77,7 @@
     ...(onPriorityCycle ? { onPriorityCycle } : {}),
     ...(onProjectEdit ? { onProjectEdit } : {}),
     ...(onDayEdit ? { onDayEdit } : {}),
+    ...(onSectionRename ? { onSectionRename } : {}),
   });
   const boardMoveProps = $derived({
     ...(onTaskMove ? { onTaskMove } : {}),

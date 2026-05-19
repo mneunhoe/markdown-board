@@ -31,3 +31,7 @@ export type TaskDeleteHandler = (target: EditTarget) => void;
 export type PriorityCycleHandler = (target: EditTarget) => void;
 export type ProjectEditOpenHandler = (target: EditTarget, current: string | null) => void;
 export type DayEditOpenHandler = (target: EditTarget, current: Day | null) => void;
+
+// Slice 6c — section (column) rename. Identifies the section by its
+// runtime id; the new name is the trimmed, non-empty string.
+export type SectionRenameHandler = (sectionId: string, nextName: string) => void;

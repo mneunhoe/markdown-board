@@ -10,6 +10,7 @@
     NoteEditHandler,
     PriorityCycleHandler,
     ProjectEditOpenHandler,
+    SectionRenameHandler,
     SubtaskAddHandler,
     SubtaskEditHandler,
     SubtaskToggleHandler,
@@ -52,6 +53,7 @@
     onPriorityCycle?: PriorityCycleHandler;
     onProjectEdit?: ProjectEditOpenHandler;
     onDayEdit?: DayEditOpenHandler;
+    onSectionRename?: SectionRenameHandler;
   }
 
   const {
@@ -70,6 +72,7 @@
     onPriorityCycle,
     onProjectEdit,
     onDayEdit,
+    onSectionRename,
   }: Props = $props();
 
   const hasSections = $derived(vault.sections.length > 0);
@@ -97,7 +100,13 @@
           onColumnMove,
         }}
       >
-        <Column name={section.name} count={section.tasks.length}>
+        <Column
+          name={section.name}
+          count={section.tasks.length}
+          {...onSectionRename
+            ? { onRename: (next: string) => onSectionRename(section.id, next) }
+            : {}}
+        >
           {#each section.tasks as task, taskIdx (task.id || `${section.id}:${task.title}`)}
             <div
               class="board-task-slot"

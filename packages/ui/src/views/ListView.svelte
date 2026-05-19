@@ -9,6 +9,7 @@
     NoteEditHandler,
     PriorityCycleHandler,
     ProjectEditOpenHandler,
+    SectionRenameHandler,
     SubtaskAddHandler,
     SubtaskEditHandler,
     SubtaskToggleHandler,
@@ -43,6 +44,7 @@
     onPriorityCycle?: PriorityCycleHandler;
     onProjectEdit?: ProjectEditOpenHandler;
     onDayEdit?: DayEditOpenHandler;
+    onSectionRename?: SectionRenameHandler;
   }
 
   const {
@@ -60,10 +62,49 @@
     onPriorityCycle,
     onProjectEdit,
     onDayEdit,
+    onSectionRename,
   }: Props = $props();
 
   const hasSections = $derived(vault.sections.length > 0);
   const taskDndEnabled = $derived(onTaskMove !== undefined);
+  const renameable = $derived(onSectionRename !== undefined);
+
+  // Per-section rename state. Keyed by sectionId so each section can be
+  // independently put into edit mode; only one at a time in practice.
+  let editingSectionId = $state<string | null>(null);
+  let editValue = $state('');
+  let editCancelled = $state(false);
+  let renameInputEl: HTMLInputElement | undefined = $state();
+
+  function startRename(sectionId: string, currentName: string): void {
+    editingSectionId = sectionId;
+    editValue = currentName;
+    editCancelled = false;
+    queueMicrotask(() => {
+      renameInputEl?.focus();
+      renameInputEl?.select();
+    });
+  }
+
+  function commitRename(): void {
+    if (editingSectionId === null || editCancelled) return;
+    const id = editingSectionId;
+    editingSectionId = null;
+    const next = editValue.trim();
+    const section = vault.sections.find((s) => s.id === id);
+    if (next && section && next !== section.name) onSectionRename?.(id, next);
+  }
+
+  function onRenameKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitRename();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      editCancelled = true;
+      editingSectionId = null;
+    }
+  }
 </script>
 
 {#if hasSections}
@@ -82,7 +123,26 @@
         }}
       >
         <header class="list-section-header">
-          <span class="section-title">{section.name}</span>
+          {#if editingSectionId === section.id}
+            <input
+              type="text"
+              class="section-rename-input"
+              data-testid="list-section-rename-input"
+              bind:this={renameInputEl}
+              bind:value={editValue}
+              onkeydown={onRenameKeydown}
+              onblur={commitRename}
+            />
+          {:else if renameable}
+            <button
+              type="button"
+              class="section-title editable"
+              data-testid="list-section-title"
+              onclick={() => startRename(section.id, section.name)}>{section.name}</button
+            >
+          {:else}
+            <span class="section-title">{section.name}</span>
+          {/if}
           <span class="count" aria-label="{section.tasks.length} tasks">
             {section.tasks.length}
           </span>
@@ -205,6 +265,37 @@
     white-space: nowrap;
     min-width: 0;
     flex: 1;
+  }
+
+  button.section-title {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    text-align: left;
+    font: inherit;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: inherit;
+    cursor: text;
+  }
+
+  .section-rename-input {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-card);
+    border: 2px solid var(--accent);
+    border-radius: 6px;
+    padding: 4px 10px;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    outline: none;
   }
 
   .count {

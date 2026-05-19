@@ -9,6 +9,7 @@ import {
   ensureUniqueTaskIds,
   moveColumn,
   moveTask,
+  renameSection,
   setSubtaskText,
   setTaskDay,
   setTaskNote,
@@ -355,6 +356,42 @@ describe('setTaskDay', () => {
     setTaskDay(v, { taskId: 'a', sectionId: 'active' }, 'Mon');
     setTaskDay(v, { taskId: 'a', sectionId: 'active' }, null);
     expect(v.sections[0]?.tasks[0]?.day).toBeNull();
+  });
+});
+
+describe('renameSection', () => {
+  it('updates name + slug id when the new name slugs differently', () => {
+    const v = vault();
+    const ok = renameSection(v, 'active', 'On Deck');
+    expect(ok).toBe(true);
+    expect(v.sections[0]?.name).toBe('On Deck');
+    expect(v.sections[0]?.id).toBe('on-deck');
+  });
+
+  it('updates only name when the slug is unchanged (same id after slugify)', () => {
+    const v = vault();
+    const ok = renameSection(v, 'active', 'ACTIVE');
+    expect(ok).toBe(true);
+    expect(v.sections[0]?.name).toBe('ACTIVE');
+    expect(v.sections[0]?.id).toBe('active');
+  });
+
+  it('returns false for empty / whitespace-only names', () => {
+    const v = vault();
+    expect(renameSection(v, 'active', '   ')).toBe(false);
+    expect(v.sections[0]?.name).toBe('Active');
+  });
+
+  it('returns false when the new id would collide with another section', () => {
+    const v = vault();
+    expect(renameSection(v, 'active', 'Done')).toBe(false);
+    expect(v.sections[0]?.name).toBe('Active');
+    expect(v.sections[0]?.id).toBe('active');
+    expect(v.sections[1]?.id).toBe('done');
+  });
+
+  it('returns false for unknown section id', () => {
+    expect(renameSection(vault(), 'ghost', 'Anything')).toBe(false);
   });
 });
 

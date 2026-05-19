@@ -10,6 +10,7 @@
     type PriorityCycleHandler,
     type ProjectEditOpenHandler,
     type ResolveHandler,
+    type SectionRenameHandler,
     type SubtaskAddHandler,
     type SubtaskEditHandler,
     type SubtaskToggleHandler,
@@ -41,6 +42,7 @@
     moveTask,
     pickVaultDirectory,
     removeTask,
+    renameSection,
     setSubtaskText,
     setTaskDay,
     setTaskNote,
@@ -205,6 +207,16 @@
     dayPicker = { target, current };
   };
 
+  const onSectionRename: SectionRenameHandler = (sectionId, nextName) => {
+    if (!loaded) return;
+    const ok = renameSection(loaded.vault, sectionId, nextName);
+    if (!ok) {
+      error = `Couldn't rename section: a section named "${nextName}" already exists.`;
+    } else if (error?.startsWith("Couldn't rename section")) {
+      error = null;
+    }
+  };
+
   function confirmProjectPicker(next: string | null): void {
     if (!projectPicker || !loaded) {
       projectPicker = null;
@@ -329,6 +341,7 @@
         {onPriorityCycle}
         {onProjectEdit}
         {onDayEdit}
+        {onSectionRename}
       />
     {:else if !supported}
       <EmptyState

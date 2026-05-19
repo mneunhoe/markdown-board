@@ -30,6 +30,7 @@ export {
   type NoteEditHandler,
   type PriorityCycleHandler,
   type ProjectEditOpenHandler,
+  type SectionRenameHandler,
   type SubtaskAddHandler,
   type SubtaskEditHandler,
   type SubtaskToggleHandler,

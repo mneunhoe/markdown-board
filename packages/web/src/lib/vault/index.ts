@@ -15,6 +15,7 @@ export {
   ensureUniqueTaskIds,
   moveColumn,
   moveTask,
+  renameSection,
   setSubtaskText,
   setTaskDay,
   setTaskNote,
