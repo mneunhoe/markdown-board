@@ -5,6 +5,7 @@
     LibraryView,
     ListView,
     OverviewView,
+    type ArchivedTaskRef,
     type ColumnMoveHandler,
     type DayEditOpenHandler,
     type FullTaskEditHandler,
@@ -18,6 +19,7 @@
     type SubtaskToggleHandler,
     type TaskDeleteHandler,
     type TaskMoveHandler,
+    type TaskUnresolveHandler,
     type TitleEditHandler,
   } from '@markdown-board/ui';
   import TabBar from './TabBar.svelte';
@@ -46,6 +48,10 @@
     onLibraryEdit?: (path: string | null) => void;
     /** Slice 6e — opens the full task editor modal. */
     onFullTaskEdit?: FullTaskEditHandler;
+    /** Slice 6g — archived tasks grouped by source-section id. */
+    archivedTasksBySection?: Record<string, ArchivedTaskRef[]>;
+    /** Slice 6g — fires when the user clicks `↺` on an archived card. */
+    onTaskUnresolve?: TaskUnresolveHandler;
   }
 
   const {
@@ -66,6 +72,8 @@
     onSectionRename,
     onLibraryEdit,
     onFullTaskEdit,
+    archivedTasksBySection = {},
+    onTaskUnresolve,
   }: Props = $props();
 
   let active = $state<TabKey>('board');
@@ -87,16 +95,22 @@
     ...(onSectionRename ? { onSectionRename } : {}),
     ...(onFullTaskEdit ? { onFullTaskEdit } : {}),
   });
+  const archiveProps = $derived({
+    archivedTasksBySection,
+    ...(onTaskUnresolve ? { onTaskUnresolve } : {}),
+  });
   const boardMoveProps = $derived({
     ...(onTaskMove ? { onTaskMove } : {}),
     ...(onColumnMove ? { onColumnMove } : {}),
     ...(onResolve ? { onResolve } : {}),
     ...editProps,
+    ...archiveProps,
   });
   const listMoveProps = $derived({
     ...(onTaskMove ? { onTaskMove } : {}),
     ...(onResolve ? { onResolve } : {}),
     ...editProps,
+    ...archiveProps,
   });
 </script>
 

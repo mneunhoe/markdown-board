@@ -7,6 +7,7 @@ import {
   appendArchiveEntry,
   findTask,
   removeTask,
+  unresolveTask,
 } from '../../../src/lib/vault/resolve.js';
 
 function task(id: string, overrides: Partial<Task> = {}): Task {
@@ -145,5 +146,136 @@ describe('appendArchiveEntry', () => {
     );
     const written = await adapter.readFile(ARCHIVE_PATH);
     expect(written).toContain('- [x] **[P1] [project:PSD_GAN] [Wed] [pom:3] Big one**');
+  });
+});
+
+describe('unresolveTask (slice 6g-3)', () => {
+  const SEED_ARCHIVE =
+    '# Archived Tasks\n\nResolved tasks moved out of `TASKS.md` by the dashboard.\n\n' +
+    '## 2026-05-18 10:00 — Active\n\n' +
+    '- [x] **[P0] Ship release** - shipped <!-- id:abc12345 -->\n' +
+    '  - [x] tag the commit\n';
+
+  function activeVault(): Vault {
+    return {
+      prelude: '',
+      sections: [
+        { id: 'active', name: 'Active', tasks: [task('x', { title: 'Open thing' })] },
+        { id: 'doing', name: 'Doing', tasks: [] },
+      ],
+    };
+  }
+
+  it('returns archive-missing when archive/TASKS.md does not exist', async () => {
+    const adapter = new InMemoryAdapter({});
+    const result = await unresolveTask(adapter, activeVault(), 'abc12345');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('archive-missing');
+  });
+
+  it('returns not-found when the id is not in the archive', async () => {
+    const adapter = new InMemoryAdapter({ [ARCHIVE_PATH]: SEED_ARCHIVE });
+    const result = await unresolveTask(adapter, activeVault(), 'unknown');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('not-found');
+  });
+
+  it('returns no-active-sections when the active vault has none', async () => {
+    const adapter = new InMemoryAdapter({ [ARCHIVE_PATH]: SEED_ARCHIVE });
+    const empty: Vault = { prelude: '', sections: [] };
+    const result = await unresolveTask(adapter, empty, 'abc12345');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('no-active-sections');
+  });
+
+  it('restores the task to the matching active section with checked=false', async () => {
+    const adapter = new InMemoryAdapter({ [ARCHIVE_PATH]: SEED_ARCHIVE });
+    const vault = activeVault();
+    const result = await unresolveTask(adapter, vault, 'abc12345');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.targetSectionId).toBe('active');
+    expect(result.sourceSection).toBe('Active');
+    expect(result.usedFallback).toBe(false);
+
+    const active = vault.sections[0]!;
+    expect(active.tasks).toHaveLength(2);
+    const restored = active.tasks[0]!;
+    expect(restored.id).toBe('abc12345');
+    expect(restored.title).toBe('Ship release');
+    expect(restored.priority).toBe('blocker');
+    expect(restored.checked).toBe(false);
+    expect(restored.note).toBe('shipped');
+    expect(restored.subtasks).toEqual([{ text: 'tag the commit', checked: true }]);
+  });
+
+  it('writes the slimmed archive content (entry removed) on success', async () => {
+    const adapter = new InMemoryAdapter({ [ARCHIVE_PATH]: SEED_ARCHIVE });
+    await unresolveTask(adapter, activeVault(), 'abc12345');
+    const remaining = await adapter.readFile(ARCHIVE_PATH);
+    expect(remaining).not.toContain('<!-- id:abc12345 -->');
+    expect(remaining).not.toContain('## 2026-05-18 10:00');
+    // Header prelude survives.
+    expect(remaining).toMatch(/^# Archived Tasks\n/);
+  });
+
+  it('falls back to the first section when sourceSection is missing in the active vault', async () => {
+    const adapter = new InMemoryAdapter({
+      [ARCHIVE_PATH]:
+        '# Archived Tasks\n\n' +
+        '## 2026-05-18 10:00 — Gone\n\n' +
+        '- [x] **Ship** <!-- id:deadbeef -->\n',
+    });
+    const vault = activeVault();
+    const result = await unresolveTask(adapter, vault, 'deadbeef');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.usedFallback).toBe(true);
+    expect(result.sourceSection).toBe('Gone');
+    expect(result.targetSectionId).toBe('active');
+    expect(vault.sections[0]?.tasks[0]?.id).toBe('deadbeef');
+  });
+
+  it('falls back to the first section when the H2 has no source-section suffix', async () => {
+    const adapter = new InMemoryAdapter({
+      [ARCHIVE_PATH]:
+        '# Archived Tasks\n\n' +
+        '## 2026-05-18 10:00\n\n' +
+        '- [x] **Anon** <!-- id:cafecafe -->\n',
+    });
+    const vault = activeVault();
+    const result = await unresolveTask(adapter, vault, 'cafecafe');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.usedFallback).toBe(true);
+    expect(result.sourceSection).toBe('');
+    expect(result.targetSectionId).toBe('active');
+  });
+
+  it('re-mints a colliding id via ensureUniqueTaskIds', async () => {
+    const adapter = new InMemoryAdapter({ [ARCHIVE_PATH]: SEED_ARCHIVE });
+    const vault: Vault = {
+      prelude: '',
+      sections: [
+        {
+          id: 'active',
+          name: 'Active',
+          tasks: [task('abc12345', { title: 'Pre-existing' })],
+        },
+      ],
+    };
+    const result = await unresolveTask(adapter, vault, 'abc12345');
+    expect(result.ok).toBe(true);
+    const ids = vault.sections[0]!.tasks.map((t) => t.id);
+    expect(new Set(ids).size).toBe(2);
+    // The pre-existing task keeps its id; the restored one gets re-minted.
+    expect(ids).toContain('abc12345');
+  });
+
+  it('inserts the restored task at the top of the target section', async () => {
+    const adapter = new InMemoryAdapter({ [ARCHIVE_PATH]: SEED_ARCHIVE });
+    const vault = activeVault();
+    await unresolveTask(adapter, vault, 'abc12345');
+    expect(vault.sections[0]?.tasks.map((t) => t.id)).toEqual(['abc12345', 'x']);
   });
 });

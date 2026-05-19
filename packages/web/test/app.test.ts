@@ -187,5 +187,85 @@ describe('App (web shell)', () => {
       expect(root.readSync('TASKS.md')).not.toContain('Goodbye');
       expect(root.readSync('TASKS.md')).toContain('Stays');
     });
+
+    it('loads an existing archive and renders an Archived expander under the source column (slice 6g)', async () => {
+      const root = seedVault({
+        'TASKS.md': '## Active\n- [ ] Open task\n',
+        'archive/TASKS.md':
+          '# Archived Tasks\n\nResolved tasks moved out of `TASKS.md` by the dashboard.\n\n' +
+          '## 2026-05-18 10:00 — Active\n\n' +
+          '- [x] **Old work** <!-- id:cafe0001 -->\n',
+      });
+      installPicker(root);
+      const { container } = render(App);
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+      );
+      await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+
+      const toggle = container.querySelector<HTMLButtonElement>('[data-testid="archived-toggle"]');
+      expect(toggle).toBeTruthy();
+      expect(toggle?.textContent).toContain('Archived (1)');
+      await fireEvent.click(toggle!);
+      expect(container.textContent).toContain('Old work');
+      expect(container.textContent).toContain('Archived 2026-05-18 10:00');
+    });
+
+    it('clicking ↺ on an archived card moves it back to the active vault (slice 6g)', async () => {
+      const root = seedVault({
+        'TASKS.md': '## Active\n- [ ] Open task\n',
+        'archive/TASKS.md':
+          '# Archived Tasks\n\nResolved tasks moved out of `TASKS.md` by the dashboard.\n\n' +
+          '## 2026-05-18 10:00 — Active\n\n' +
+          '- [x] **Old work** <!-- id:cafe0001 -->\n',
+      });
+      installPicker(root);
+      const { container } = render(App);
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+      );
+      await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="archived-toggle"]')!,
+      );
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="task-unresolve"]')!,
+      );
+
+      // Wait for the disk write + the autosave debounce.
+      await new Promise((r) => setTimeout(r, 800));
+      // archive/TASKS.md no longer contains the id.
+      expect(root.readSync('archive/TASKS.md')).not.toContain('<!-- id:cafe0001 -->');
+      // TASKS.md gained the unresolved task as `- [ ]`.
+      expect(root.readSync('TASKS.md')).toContain('- [ ] **Old work**');
+    });
+
+    it('unresolving an orphaned archive entry surfaces a fallback alert (slice 6g)', async () => {
+      const root = seedVault({
+        'TASKS.md': '## Active\n- [ ] Open task\n',
+        'archive/TASKS.md':
+          '# Archived Tasks\n\n' +
+          '## 2026-05-18 10:00 — Gone\n\n' +
+          '- [x] **Orphan** <!-- id:cafe0002 -->\n',
+      });
+      installPicker(root);
+      const { container } = render(App);
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+      );
+      await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="archived-toggle"]')!,
+      );
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="task-unresolve"]')!,
+      );
+
+      await waitFor(() => {
+        expect(container.querySelector('[role=alert]')?.textContent).toContain('Gone');
+      });
+    });
   });
 });

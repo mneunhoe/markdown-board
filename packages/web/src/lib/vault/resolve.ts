@@ -6,8 +6,14 @@
 // doesn't leave the vault and the archive out of sync.
 
 import type { FileAdapter, Section, Task } from '@markdown-board/core';
-import { appendToArchive, buildArchiveEntry, FileNotFoundError } from '@markdown-board/core';
+import {
+  appendToArchive,
+  buildArchiveEntry,
+  FileNotFoundError,
+  removeArchivedTask,
+} from '@markdown-board/core';
 import type { Vault } from '@markdown-board/core';
+import { ensureUniqueTaskIds } from './mutate.js';
 
 export const ARCHIVE_PATH = 'archive/TASKS.md';
 
@@ -78,4 +84,86 @@ export function removeTask(vault: Vault, target: { taskId: string; sectionId: st
   if (idx === -1) return false;
   section.tasks.splice(idx, 1);
   return true;
+}
+
+export type UnresolveFailure =
+  | { ok: false; reason: 'archive-missing' }
+  | { ok: false; reason: 'not-found' }
+  | { ok: false; reason: 'no-active-sections' };
+
+export interface UnresolveSuccess {
+  ok: true;
+  /** Id of the active section the task landed in. */
+  targetSectionId: string;
+  /** Original section name from the archive H2 (empty when the H2 had no ` — Section` suffix). */
+  sourceSection: string;
+  /**
+   * `true` if the source section no longer exists in the active vault
+   * (renamed via slice 6c or deleted), so the task fell back to the
+   * first active section. The caller can surface a `role="alert"` to
+   * tell the user which column the task actually landed in.
+   */
+  usedFallback: boolean;
+}
+
+export type UnresolveTaskResult = UnresolveSuccess | UnresolveFailure;
+
+/**
+ * Move an archived task back into the active vault — the symmetric of
+ * `confirmResolve`. Reads `archive/TASKS.md`, slices the matching
+ * `<!-- id:taskId -->` entry out via core's `removeArchivedTask`,
+ * inserts the task at the top of the matching active section with
+ * `checked = false`, and writes the slimmed archive content.
+ *
+ * The merged resolution-and-original note from slice 6f stays in
+ * place on the unresolved task — the round-trip is mildly lossy by
+ * design (see slice 6g Q8: the user can edit the note via the inline
+ * editor afterward if they want to trim it).
+ *
+ * Section fallback: when no active section's name matches
+ * `removed.sourceSection`, the task lands in `vault.sections[0]` and
+ * the result carries `usedFallback: true` so App.svelte can surface
+ * an alert.
+ *
+ * `ensureUniqueTaskIds(vault)` runs post-insert so a re-introduced id
+ * that collides with one already in the active vault gets re-minted
+ * instead of breaking DnD identity. The original archive entry was
+ * already written with that id; we don't try to rewrite it.
+ */
+export async function unresolveTask(
+  adapter: FileAdapter,
+  vault: Vault,
+  taskId: string,
+): Promise<UnresolveTaskResult> {
+  let content: string;
+  try {
+    content = await adapter.readFile(ARCHIVE_PATH);
+  } catch (err) {
+    if (err instanceof FileNotFoundError) return { ok: false, reason: 'archive-missing' };
+    throw err;
+  }
+
+  const { content: nextContent, removed } = removeArchivedTask(content, taskId);
+  if (!removed) return { ok: false, reason: 'not-found' };
+
+  if (vault.sections.length === 0) return { ok: false, reason: 'no-active-sections' };
+
+  const matching = removed.sourceSection
+    ? (vault.sections.find((s) => s.name === removed.sourceSection) ?? null)
+    : null;
+  const targetSection = matching ?? vault.sections[0]!;
+  const usedFallback = matching === null;
+
+  const restored: Task = { ...removed.task, checked: false };
+  targetSection.tasks.unshift(restored);
+  ensureUniqueTaskIds(vault);
+
+  await adapter.writeFile(ARCHIVE_PATH, nextContent);
+
+  return {
+    ok: true,
+    targetSectionId: targetSection.id,
+    sourceSection: removed.sourceSection,
+    usedFallback,
+  };
 }

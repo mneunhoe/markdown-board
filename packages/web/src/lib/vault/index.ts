@@ -34,5 +34,9 @@ export {
   appendArchiveEntry,
   findTask,
   removeTask,
+  unresolveTask,
   type AppendArchiveEntryOptions,
+  type UnresolveFailure,
+  type UnresolveSuccess,
+  type UnresolveTaskResult,
 } from './resolve.js';

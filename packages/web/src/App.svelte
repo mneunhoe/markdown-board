@@ -3,6 +3,7 @@
   import type { Day, Section, Task } from '@markdown-board/core';
   import {
     EmptyState,
+    type ArchivedTaskRef,
     type ColumnMoveHandler,
     type DayEditOpenHandler,
     type EditTarget,
@@ -17,6 +18,7 @@
     type SubtaskToggleHandler,
     type TaskDeleteHandler,
     type TaskMoveHandler,
+    type TaskUnresolveHandler,
     type TitleEditHandler,
   } from '@markdown-board/ui';
   import { FSAFileAdapter } from './lib/adapters/index.js';
@@ -40,6 +42,7 @@
     deleteTask,
     findTask,
     isFileSystemAccessSupported,
+    loadArchive,
     loadVault,
     moveColumn,
     moveTask,
@@ -54,6 +57,7 @@
     setTaskProject,
     setTaskTitle,
     toggleSubtask,
+    unresolveTask,
     type LoadedVault,
   } from './lib/vault/index.js';
 
@@ -311,6 +315,72 @@
 
   const projectSuggestions = $derived(loaded ? allProjects(loaded.vault) : []);
 
+  // Slice 6g-3 — group archive entries by source-section name and map
+  // to the matching active section's id. Orphans (source section
+  // missing from the active vault) fall back to the first section so
+  // the user can still see + unresolve them. Newest first within each
+  // group, since the archive file is append-only / chronological.
+  const ARCHIVE_H2_PARSE_RE = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?: — (.+))?$/;
+  const archivedTasksBySection = $derived.by<Record<string, ArchivedTaskRef[]>>(() => {
+    if (!loaded || !loaded.archive) return {};
+    const firstSectionId = loaded.vault.sections[0]?.id;
+    if (!firstSectionId) return {};
+    const out: Record<string, ArchivedTaskRef[]> = {};
+    for (const archiveSection of loaded.archive.sections) {
+      const m = ARCHIVE_H2_PARSE_RE.exec(archiveSection.name);
+      if (!m) continue;
+      const archivedAt = m[1]!;
+      const sourceSection = (m[2] ?? '').trim();
+      const matching = sourceSection
+        ? loaded.vault.sections.find((s) => s.name === sourceSection)
+        : null;
+      const targetId = matching?.id ?? firstSectionId;
+      for (const task of archiveSection.tasks) {
+        (out[targetId] ??= []).push({ task, archivedAt });
+      }
+    }
+    // Newest first within each column.
+    for (const id of Object.keys(out)) {
+      out[id]!.sort((a, b) =>
+        a.archivedAt < b.archivedAt ? 1 : a.archivedAt > b.archivedAt ? -1 : 0,
+      );
+    }
+    return out;
+  });
+
+  async function refreshArchive(): Promise<void> {
+    if (!adapter || !loaded) return;
+    loaded.archive = await loadArchive(adapter);
+  }
+
+  const onTaskUnresolve: TaskUnresolveHandler = async (target) => {
+    if (!loaded || !adapter) return;
+    try {
+      const result = await unresolveTask(adapter, loaded.vault, target.taskId);
+      if (!result.ok) {
+        if (result.reason === 'archive-missing') {
+          error = 'No archive file to unresolve from.';
+        } else if (result.reason === 'not-found') {
+          error = "Couldn't find that task in the archive.";
+        } else if (result.reason === 'no-active-sections') {
+          error = 'No active section to move the task to.';
+        }
+        return;
+      }
+      if (result.usedFallback) {
+        const fromName = result.sourceSection || '(no section)';
+        const toName =
+          loaded.vault.sections.find((s) => s.id === result.targetSectionId)?.name ?? '?';
+        error = `Section "${fromName}" is gone — moved the task to "${toName}".`;
+      } else if (error?.startsWith('Section "')) {
+        error = null;
+      }
+      await refreshArchive();
+    } catch (err) {
+      error = `Unresolve failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  };
+
   async function confirmResolve(resolution: string): Promise<void> {
     if (!resolveTarget || !adapter || !loaded || resolving) return;
     const { task, section } = resolveTarget;
@@ -321,6 +391,9 @@
       await autosaver?.flush();
       await appendArchiveEntry(adapter, task, resolution, section);
       removeTask(loaded.vault, { taskId: task.id, sectionId: section.id });
+      // Refresh the in-memory archive Vault so the Archived expander
+      // under the source column updates in the same render frame.
+      await refreshArchive();
       resolveTarget = null;
     } catch (err) {
       error = `Resolve failed: ${err instanceof Error ? err.message : String(err)}`;
@@ -410,6 +483,8 @@
         {onSectionRename}
         onLibraryEdit={openLibraryEditor}
         {onFullTaskEdit}
+        {archivedTasksBySection}
+        {onTaskUnresolve}
       />
     {:else if !supported}
       <EmptyState
