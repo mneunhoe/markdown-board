@@ -1,5 +1,5 @@
-import { render } from '@testing-library/svelte';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render } from '@testing-library/svelte';
+import { describe, expect, it, vi } from 'vitest';
 import LibraryView from '../../src/views/LibraryView.svelte';
 import type { LibraryDoc } from '@markdown-board/core';
 
@@ -10,6 +10,7 @@ function makeDoc(overrides: Partial<LibraryDoc> = {}): LibraryDoc {
     sections: {},
     tables: [],
     rawContent: '',
+    path: '',
     ...overrides,
   };
 }
@@ -114,5 +115,52 @@ describe('LibraryView', () => {
     const { container } = render(LibraryView, { docs: [] });
     expect(container.querySelector('.empty-state')).not.toBeNull();
     expect(container.querySelector('.library-doc')).toBeNull();
+  });
+
+  describe('onEdit (slice 6d)', () => {
+    it('without onEdit, no edit / new buttons are rendered', () => {
+      const { container } = render(LibraryView, {
+        docs: [makeDoc({ title: 'A', path: 'library/a.md' })],
+      });
+      expect(container.querySelector('.library-edit-btn')).toBeNull();
+      expect(container.querySelector('.library-new-btn')).toBeNull();
+    });
+
+    it('with onEdit, each doc gets an Edit button keyed by its path', () => {
+      const { container } = render(LibraryView, {
+        docs: [makeDoc({ title: 'A', path: 'library/a.md' })],
+        onEdit: vi.fn(),
+      });
+      expect(container.querySelector('[data-testid="library-edit-library/a.md"]')).toBeTruthy();
+    });
+
+    it('clicking Edit calls onEdit with the doc path', async () => {
+      const onEdit = vi.fn();
+      const { container } = render(LibraryView, {
+        docs: [makeDoc({ title: 'A', path: 'library/a.md' })],
+        onEdit,
+      });
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="library-edit-library/a.md"]')!,
+      );
+      expect(onEdit).toHaveBeenCalledWith('library/a.md');
+    });
+
+    it('with onEdit, a "+ New file" button is rendered (and clicking it calls onEdit with null)', async () => {
+      const onEdit = vi.fn();
+      const { container } = render(LibraryView, {
+        docs: [makeDoc({ title: 'A', path: 'library/a.md' })],
+        onEdit,
+      });
+      const newBtn = container.querySelector<HTMLButtonElement>('[data-testid="library-new"]');
+      expect(newBtn).toBeTruthy();
+      await fireEvent.click(newBtn!);
+      expect(onEdit).toHaveBeenCalledWith(null);
+    });
+
+    it('with onEdit and no docs, the empty state still shows a "+ New file" affordance', () => {
+      const { container } = render(LibraryView, { docs: [], onEdit: vi.fn() });
+      expect(container.querySelector('[data-testid="library-new"]')).toBeTruthy();
+    });
   });
 });

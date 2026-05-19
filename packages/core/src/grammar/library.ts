@@ -17,6 +17,7 @@ export function parseLibrary(content: string): LibraryDoc {
     sections: { _intro: '' },
     tables: [],
     rawContent: normalised,
+    path: '',
   };
 
   const sectionLines: Record<string, string[]> = { _intro: [] };

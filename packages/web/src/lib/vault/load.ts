@@ -25,7 +25,9 @@ export async function loadVault(adapter: FileAdapter): Promise<LoadedVault> {
   const libraryDocs: LibraryDoc[] = [];
   for (const path of paths) {
     const content = await adapter.readFile(path);
-    libraryDocs.push(parseLibrary(content));
+    const doc = parseLibrary(content);
+    doc.path = path;
+    libraryDocs.push(doc);
   }
 
   return { vault, libraryDocs };

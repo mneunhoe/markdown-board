@@ -37,6 +37,7 @@ function makeDocs(): LibraryDoc[] {
       sections: {},
       tables: [],
       rawContent: '# Alpha\n',
+      path: 'library/alpha.md',
     },
   ];
 }

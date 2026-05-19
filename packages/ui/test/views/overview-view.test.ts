@@ -33,6 +33,7 @@ function makeDoc(overrides: Partial<LibraryDoc> = {}): LibraryDoc {
     sections: {},
     tables: [],
     rawContent: '',
+    path: '',
     ...overrides,
   };
 }

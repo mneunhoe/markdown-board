@@ -41,6 +41,8 @@
     onProjectEdit?: ProjectEditOpenHandler;
     onDayEdit?: DayEditOpenHandler;
     onSectionRename?: SectionRenameHandler;
+    /** Slice 6d — opens the library editor modal. `null` ⇒ New File. */
+    onLibraryEdit?: (path: string | null) => void;
   }
 
   const {
@@ -59,6 +61,7 @@
     onProjectEdit,
     onDayEdit,
     onSectionRename,
+    onLibraryEdit,
   }: Props = $props();
 
   let active = $state<TabKey>('board');
@@ -101,7 +104,7 @@
     {:else if active === 'list'}
       <ListView {vault} {...listMoveProps} />
     {:else if active === 'library'}
-      <LibraryView docs={libraryDocs} />
+      <LibraryView docs={libraryDocs} {...onLibraryEdit ? { onEdit: onLibraryEdit } : {}} />
     {:else if active === 'overview'}
       <OverviewView {vault} {libraryDocs} />
     {/if}

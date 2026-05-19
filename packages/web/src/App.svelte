@@ -20,6 +20,7 @@
   } from '@markdown-board/ui';
   import { FSAFileAdapter } from './lib/adapters/index.js';
   import DayPickerModal from './components/DayPickerModal.svelte';
+  import LibraryEditorModal from './components/LibraryEditorModal.svelte';
   import ProjectPickerModal from './components/ProjectPickerModal.svelte';
   import ResolveModal from './components/ResolveModal.svelte';
   import SettingsModal from './components/SettingsModal.svelte';
@@ -43,6 +44,7 @@
     pickVaultDirectory,
     removeTask,
     renameSection,
+    saveLibraryFile,
     setSubtaskText,
     setTaskDay,
     setTaskNote,
@@ -68,6 +70,9 @@
   // reload can't shift the picker between picks.
   let projectPicker = $state<{ target: EditTarget; current: string | null } | null>(null);
   let dayPicker = $state<{ target: EditTarget; current: Day | null } | null>(null);
+  // Library editor (slice 6d). `path: null` ⇒ New File dialog.
+  let libraryEditor = $state<{ path: string | null; initialContent: string } | null>(null);
+  let savingLibrary = $state(false);
 
   let adapter: FSAFileAdapter | null = null;
   let autosaver: Autosaver | null = null;
@@ -217,6 +222,34 @@
     }
   };
 
+  function openLibraryEditor(path: string | null): void {
+    if (!loaded) return;
+    if (path === null) {
+      libraryEditor = { path: null, initialContent: '' };
+      return;
+    }
+    const doc = loaded.libraryDocs.find((d) => d.path === path);
+    libraryEditor = { path, initialContent: doc?.rawContent ?? '' };
+  }
+
+  async function confirmLibraryEditor(next: { path: string; content: string }): Promise<void> {
+    if (!loaded || !adapter || savingLibrary) return;
+    savingLibrary = true;
+    try {
+      await saveLibraryFile(adapter, loaded.libraryDocs, next.path, next.content);
+      libraryEditor = null;
+    } catch (err) {
+      error = `Library save failed: ${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+      savingLibrary = false;
+    }
+  }
+
+  function cancelLibraryEditor(): void {
+    if (savingLibrary) return;
+    libraryEditor = null;
+  }
+
   function confirmProjectPicker(next: string | null): void {
     if (!projectPicker || !loaded) {
       projectPicker = null;
@@ -342,6 +375,7 @@
         {onProjectEdit}
         {onDayEdit}
         {onSectionRename}
+        onLibraryEdit={openLibraryEditor}
       />
     {:else if !supported}
       <EmptyState
@@ -396,6 +430,14 @@
     current={dayPicker?.current ?? null}
     onConfirm={confirmDayPicker}
     onCancel={cancelDayPicker}
+  />
+
+  <LibraryEditorModal
+    open={libraryEditor !== null}
+    path={libraryEditor?.path ?? null}
+    initialContent={libraryEditor?.initialContent ?? ''}
+    onConfirm={confirmLibraryEditor}
+    onCancel={cancelLibraryEditor}
   />
 </main>
 

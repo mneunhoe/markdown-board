@@ -55,4 +55,13 @@ export interface LibraryDoc {
   sections: Record<string, string>;
   tables: LibraryTable[];
   rawContent: string;
+  /**
+   * Source file path relative to the vault root (e.g.
+   * `library/projects/psd-gan.md`). `parseLibrary` leaves this as `''`;
+   * the loader (`loadVault`) fills it in post-parse so editors / writers
+   * know which file to round-trip changes back to. Required field rather
+   * than optional so consumers don't need to defend against `undefined`
+   * — an empty string is the explicit "no source" signal.
+   */
+  path: string;
 }

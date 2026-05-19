@@ -6,15 +6,25 @@
     docs: LibraryDoc[];
     emptyTitle?: string;
     emptyHint?: string;
+    /**
+     * When provided, each library doc renders an "Edit" button in its
+     * header (and an "+ New file" affordance at the bottom of the view).
+     * The handler receives the source `path` so the host shell can open
+     * an editor modal for that file. `null` opens the new-file dialog
+     * with a blank initial value.
+     */
+    onEdit?: (path: string | null) => void;
   }
 
   const {
     docs,
     emptyTitle = 'No library entries yet',
     emptyHint = 'Drop Markdown files into `library/` to see them here.',
+    onEdit,
   }: Props = $props();
 
   const hasDocs = $derived(docs.length > 0);
+  const editable = $derived(onEdit !== undefined);
 
   function nonIntroSections(doc: LibraryDoc): Array<[string, string]> {
     return Object.entries(doc.sections).filter(([name, content]) => name !== '_intro' && content);
@@ -27,6 +37,16 @@
       <article class="library-doc">
         <header class="library-doc-header">
           <h2 class="library-doc-title">{doc.title || 'Untitled'}</h2>
+          {#if editable}
+            <button
+              type="button"
+              class="library-edit-btn"
+              data-testid="library-edit-{doc.path}"
+              data-path={doc.path}
+              aria-label="Edit {doc.path}"
+              onclick={() => onEdit?.(doc.path)}>Edit</button
+            >
+          {/if}
         </header>
 
         {#if Object.keys(doc.fields).length > 0}
@@ -69,6 +89,24 @@
         {/each}
       </article>
     {/each}
+    {#if editable}
+      <button
+        type="button"
+        class="library-new-btn"
+        data-testid="library-new"
+        onclick={() => onEdit?.(null)}>+ New file</button
+      >
+    {/if}
+  </div>
+{:else if editable}
+  <div class="library-view">
+    <EmptyState title={emptyTitle} hint={emptyHint} />
+    <button
+      type="button"
+      class="library-new-btn"
+      data-testid="library-new"
+      onclick={() => onEdit?.(null)}>+ New file</button
+    >
   </div>
 {:else}
   <EmptyState title={emptyTitle} hint={emptyHint} />
@@ -94,12 +132,52 @@
     border-bottom: 1px solid var(--border-light);
     margin-bottom: 16px;
     padding-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
 
   .library-doc-title {
     margin: 0;
     font-size: 18px;
     font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .library-edit-btn {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .library-edit-btn:hover {
+    border-color: var(--accent);
+  }
+
+  .library-new-btn {
+    appearance: none;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 13px;
+    font-style: italic;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .library-new-btn:hover {
+    border-color: var(--accent);
     color: var(--text-primary);
   }
 

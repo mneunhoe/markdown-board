@@ -1,4 +1,5 @@
 export { loadVault, type LoadedVault } from './load.js';
+export { saveLibraryFile } from './library.js';
 export {
   FileSystemAccessUnsupportedError,
   VaultPickerCancelledError,
