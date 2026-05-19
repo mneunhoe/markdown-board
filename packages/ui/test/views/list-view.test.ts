@@ -1,5 +1,5 @@
-import { render } from '@testing-library/svelte';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render } from '@testing-library/svelte';
+import { describe, expect, it, vi } from 'vitest';
 import ListView from '../../src/views/ListView.svelte';
 import type { Section, Task, Vault } from '@markdown-board/core';
 
@@ -77,5 +77,31 @@ describe('ListView', () => {
     const { container } = render(ListView, { vault: makeVault([]) });
     expect(container.querySelector('.empty-state')).not.toBeNull();
     expect(container.querySelector('.list-section')).toBeNull();
+  });
+
+  describe('onResolve', () => {
+    it('forwards onResolve to every TaskCard checkbox with task + section ids', async () => {
+      const onResolve = vi.fn();
+      const vault = makeVault([
+        makeSection('active', 'Active', [makeTask({ id: 't1', title: 'one' })]),
+        makeSection('done', 'Done', [makeTask({ id: 't2', title: 'two' })]),
+      ]);
+      const { container } = render(ListView, { vault, onResolve });
+      const checkboxes = container.querySelectorAll<HTMLInputElement>('.card-checkbox');
+      expect(checkboxes).toHaveLength(2);
+      await fireEvent.click(checkboxes[1]!);
+      expect(onResolve).toHaveBeenCalledOnce();
+      expect(onResolve).toHaveBeenCalledWith({ taskId: 't2', sectionId: 'done' });
+    });
+
+    it('leaves checkboxes presentation-only when onResolve is omitted', () => {
+      const vault = makeVault([
+        makeSection('active', 'Active', [makeTask({ id: 't1', title: 'one' })]),
+      ]);
+      const { container } = render(ListView, { vault });
+      const checkbox = container.querySelector<HTMLInputElement>('.card-checkbox');
+      expect(checkbox?.tabIndex).toBe(-1);
+      expect(checkbox?.classList.contains('interactive')).toBe(false);
+    });
   });
 });

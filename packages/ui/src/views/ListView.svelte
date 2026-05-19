@@ -3,6 +3,7 @@
   import TaskCard from '../components/TaskCard.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import type { TaskMoveHandler } from '../lib/dnd.js';
+  import type { ResolveHandler } from '../lib/resolve.js';
   import { columnDropTarget, taskDraggable, taskDropTarget } from '../lib/dnd-actions.js';
 
   interface Props {
@@ -15,6 +16,12 @@
      * listeners. Column reorder is BoardView-only and not exposed here.
      */
     onTaskMove?: TaskMoveHandler;
+    /**
+     * Called when a task's checkbox is clicked. When omitted, the checkbox
+     * stays presentation-only. The shell typically opens a resolve modal
+     * here.
+     */
+    onResolve?: ResolveHandler;
   }
 
   const {
@@ -22,6 +29,7 @@
     emptyTitle = 'No tasks yet',
     emptyHint = 'Add a `- [ ]` line under any H2 heading in TASKS.md.',
     onTaskMove,
+    onResolve,
   }: Props = $props();
 
   const hasSections = $derived(vault.sections.length > 0);
@@ -67,7 +75,12 @@
                 onTaskMove,
               }}
             >
-              <TaskCard {task} />
+              <TaskCard
+                {task}
+                {...onResolve
+                  ? { onResolve: () => onResolve({ taskId: task.id, sectionId: section.id }) }
+                  : {}}
+              />
             </div>
           {/each}
         </div>

@@ -6,6 +6,7 @@
     ListView,
     OverviewView,
     type ColumnMoveHandler,
+    type ResolveHandler,
     type TaskMoveHandler,
   } from '@markdown-board/ui';
   import TabBar from './TabBar.svelte';
@@ -17,21 +18,27 @@
     /** Wired by App.svelte when a writable vault is open. Omitted ⇒ DnD off. */
     onTaskMove?: TaskMoveHandler;
     onColumnMove?: ColumnMoveHandler;
+    /** Opens the resolve modal in App.svelte. Omitted ⇒ checkboxes presentation-only. */
+    onResolve?: ResolveHandler;
   }
 
-  const { vault, libraryDocs, onTaskMove, onColumnMove }: Props = $props();
+  const { vault, libraryDocs, onTaskMove, onColumnMove, onResolve }: Props = $props();
 
   let active = $state<TabKey>('board');
 
   // Conditionally-keyed prop bags so an undefined handler is *absent*
   // rather than passed as `undefined` — required under
   // `exactOptionalPropertyTypes` since BoardView / ListView declare
-  // their move props as `onTaskMove?: TaskMoveHandler`.
+  // their move / resolve props as `?: T`.
   const boardMoveProps = $derived({
     ...(onTaskMove ? { onTaskMove } : {}),
     ...(onColumnMove ? { onColumnMove } : {}),
+    ...(onResolve ? { onResolve } : {}),
   });
-  const listMoveProps = $derived(onTaskMove ? { onTaskMove } : {});
+  const listMoveProps = $derived({
+    ...(onTaskMove ? { onTaskMove } : {}),
+    ...(onResolve ? { onResolve } : {}),
+  });
 </script>
 
 <div class="workspace">

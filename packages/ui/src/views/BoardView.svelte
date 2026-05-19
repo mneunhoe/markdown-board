@@ -4,6 +4,7 @@
   import TaskCard from '../components/TaskCard.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import type { ColumnMoveHandler, TaskMoveHandler } from '../lib/dnd.js';
+  import type { ResolveHandler } from '../lib/resolve.js';
   import {
     columnDraggable,
     columnDropTarget,
@@ -24,6 +25,12 @@
     onTaskMove?: TaskMoveHandler;
     /** Called when a column is reordered. Omitted ⇒ column DnD disabled. */
     onColumnMove?: ColumnMoveHandler;
+    /**
+     * Called when a task's checkbox is clicked. When omitted, the checkbox
+     * stays presentation-only. The shell typically opens a resolve modal
+     * here.
+     */
+    onResolve?: ResolveHandler;
   }
 
   const {
@@ -32,6 +39,7 @@
     emptyHint = 'Add an H2 heading to TASKS.md to create your first column.',
     onTaskMove,
     onColumnMove,
+    onResolve,
   }: Props = $props();
 
   const hasSections = $derived(vault.sections.length > 0);
@@ -77,7 +85,12 @@
                 onTaskMove,
               }}
             >
-              <TaskCard {task} />
+              <TaskCard
+                {task}
+                {...onResolve
+                  ? { onResolve: () => onResolve({ taskId: task.id, sectionId: section.id }) }
+                  : {}}
+              />
             </div>
           {/each}
         </Column>

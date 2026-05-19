@@ -14,3 +14,10 @@ export {
   type ColumnMove,
   type TaskMove,
 } from './mutate.js';
+export {
+  ARCHIVE_PATH,
+  appendArchiveEntry,
+  findTask,
+  removeTask,
+  type AppendArchiveEntryOptions,
+} from './resolve.js';

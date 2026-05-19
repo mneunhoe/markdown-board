@@ -1,18 +1,28 @@
 <script lang="ts">
   import { toMarkdown } from '@markdown-board/core';
-  import { EmptyState, type ColumnMoveHandler, type TaskMoveHandler } from '@markdown-board/ui';
+  import type { Section, Task } from '@markdown-board/core';
+  import {
+    EmptyState,
+    type ColumnMoveHandler,
+    type ResolveHandler,
+    type TaskMoveHandler,
+  } from '@markdown-board/ui';
   import { FSAFileAdapter } from './lib/adapters/index.js';
+  import ResolveModal from './components/ResolveModal.svelte';
   import VaultWorkspace from './components/VaultWorkspace.svelte';
   import {
     Autosaver,
     ExternalChangeWatcher,
     FileSystemAccessUnsupportedError,
     VaultPickerCancelledError,
+    appendArchiveEntry,
+    findTask,
     isFileSystemAccessSupported,
     loadVault,
     moveColumn,
     moveTask,
     pickVaultDirectory,
+    removeTask,
     type LoadedVault,
   } from './lib/vault/index.js';
 
@@ -22,6 +32,9 @@
   let loading = $state(false);
   let error = $state<string | null>(null);
   let lastWrittenMd = $state<string>('');
+  /** Captured at modal-open time so a concurrent external reload can't shift the target. */
+  let resolveTarget = $state<{ task: Task; section: Section } | null>(null);
+  let resolving = $state(false);
 
   let adapter: FSAFileAdapter | null = null;
   let autosaver: Autosaver | null = null;
@@ -111,6 +124,36 @@
     moveColumn(loaded.vault, move);
   };
 
+  const onResolve: ResolveHandler = (target) => {
+    if (!loaded) return;
+    const found = findTask(loaded.vault, target);
+    if (!found) return;
+    resolveTarget = found;
+  };
+
+  async function confirmResolve(resolution: string): Promise<void> {
+    if (!resolveTarget || !adapter || !loaded || resolving) return;
+    const { task, section } = resolveTarget;
+    resolving = true;
+    try {
+      // Flush any pending autosave first so the archive entry mirrors what's
+      // about to be on disk in TASKS.md.
+      await autosaver?.flush();
+      await appendArchiveEntry(adapter, task, resolution, section);
+      removeTask(loaded.vault, { taskId: task.id, sectionId: section.id });
+      resolveTarget = null;
+    } catch (err) {
+      error = `Resolve failed: ${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+      resolving = false;
+    }
+  }
+
+  function cancelResolve(): void {
+    if (resolving) return;
+    resolveTarget = null;
+  }
+
   // Autosave $effect — re-runs on any deep mutation of `loaded.vault`
   // (Svelte 5's proxy traverses sections/tasks). Schedules a write when
   // the canonical markdown drifts from what we last wrote.
@@ -149,6 +192,7 @@
         libraryDocs={loaded.libraryDocs}
         {onTaskMove}
         {onColumnMove}
+        {onResolve}
       />
     {:else if !supported}
       <EmptyState
@@ -176,6 +220,12 @@
       <p class="error" role="alert">{error}</p>
     {/if}
   </section>
+
+  <ResolveModal
+    taskTitle={resolveTarget?.task.title ?? null}
+    onConfirm={confirmResolve}
+    onCancel={cancelResolve}
+  />
 </main>
 
 <style>

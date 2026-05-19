@@ -23,3 +23,4 @@ export {
   isColumnDragData,
   isTaskDragData,
 } from './lib/dnd.js';
+export { type ResolveHandler, type ResolveTarget } from './lib/resolve.js';

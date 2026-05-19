@@ -6,9 +6,28 @@
 
   interface Props {
     task: Task;
+    /**
+     * When provided, the checkbox becomes interactive — clicking it calls
+     * back so the host shell can open a resolve flow (write to
+     * archive/TASKS.md and remove the task). Omitted ⇒ checkbox is
+     * presentation-only (current `tabindex=-1` / `readonly` behaviour).
+     */
+    onResolve?: () => void;
   }
 
-  const { task }: Props = $props();
+  const { task, onResolve }: Props = $props();
+  const interactive = $derived(onResolve !== undefined);
+
+  function handleClick(): void {
+    onResolve?.();
+  }
+
+  function handleKeydown(event: KeyboardEvent): void {
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault();
+      onResolve?.();
+    }
+  }
 </script>
 
 <article class="task-card" class:checked={task.checked} data-task-id={task.id || null}>
@@ -16,10 +35,13 @@
     <input
       type="checkbox"
       class="card-checkbox"
+      class:interactive
       checked={task.checked}
-      aria-label={`Toggle ${task.title}`}
-      readonly
-      tabindex="-1"
+      aria-label={interactive ? `Resolve ${task.title}` : `Toggle ${task.title}`}
+      readonly={!interactive}
+      tabindex={interactive ? 0 : -1}
+      onclick={interactive ? handleClick : null}
+      onkeydown={interactive ? handleKeydown : null}
     />
     <div class="card-title">{task.title}</div>
   </div>
@@ -84,6 +106,10 @@
     margin: 3px 0 0 0;
     flex-shrink: 0;
     cursor: default;
+  }
+
+  .card-checkbox.interactive {
+    cursor: pointer;
   }
 
   .card-title {

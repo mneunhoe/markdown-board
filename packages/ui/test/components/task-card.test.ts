@@ -1,5 +1,5 @@
-import { render } from '@testing-library/svelte';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render } from '@testing-library/svelte';
+import { describe, expect, it, vi } from 'vitest';
 import TaskCard from '../../src/components/TaskCard.svelte';
 import type { Task } from '@markdown-board/core';
 
@@ -100,5 +100,52 @@ describe('TaskCard', () => {
   it('omits the data-task-id attribute when id is empty', () => {
     const { container } = render(TaskCard, { task: makeTask({ id: '' }) });
     expect(container.querySelector('.task-card')?.hasAttribute('data-task-id')).toBe(false);
+  });
+
+  describe('onResolve', () => {
+    it('without onResolve, the checkbox is presentation-only', () => {
+      const { container } = render(TaskCard, { task: makeTask() });
+      const checkbox = container.querySelector<HTMLInputElement>('.card-checkbox');
+      expect(checkbox?.tabIndex).toBe(-1);
+      expect(checkbox?.hasAttribute('readonly')).toBe(true);
+      expect(checkbox?.classList.contains('interactive')).toBe(false);
+      expect(checkbox?.getAttribute('aria-label')).toBe('Toggle Write the spec');
+    });
+
+    it('with onResolve, the checkbox is keyboard-focusable and interactive', () => {
+      const { container } = render(TaskCard, {
+        task: makeTask(),
+        onResolve: () => {},
+      });
+      const checkbox = container.querySelector<HTMLInputElement>('.card-checkbox');
+      expect(checkbox?.tabIndex).toBe(0);
+      expect(checkbox?.hasAttribute('readonly')).toBe(false);
+      expect(checkbox?.classList.contains('interactive')).toBe(true);
+      expect(checkbox?.getAttribute('aria-label')).toBe('Resolve Write the spec');
+    });
+
+    it('clicking the checkbox calls onResolve', async () => {
+      const onResolve = vi.fn();
+      const { container } = render(TaskCard, { task: makeTask(), onResolve });
+      const checkbox = container.querySelector<HTMLInputElement>('.card-checkbox');
+      await fireEvent.click(checkbox!);
+      expect(onResolve).toHaveBeenCalledOnce();
+    });
+
+    it('pressing Enter on the checkbox calls onResolve', async () => {
+      const onResolve = vi.fn();
+      const { container } = render(TaskCard, { task: makeTask(), onResolve });
+      const checkbox = container.querySelector<HTMLInputElement>('.card-checkbox');
+      await fireEvent.keyDown(checkbox!, { key: 'Enter' });
+      expect(onResolve).toHaveBeenCalledOnce();
+    });
+
+    it('pressing Space on the checkbox calls onResolve', async () => {
+      const onResolve = vi.fn();
+      const { container } = render(TaskCard, { task: makeTask(), onResolve });
+      const checkbox = container.querySelector<HTMLInputElement>('.card-checkbox');
+      await fireEvent.keyDown(checkbox!, { key: ' ' });
+      expect(onResolve).toHaveBeenCalledOnce();
+    });
   });
 });
