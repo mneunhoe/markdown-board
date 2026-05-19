@@ -14,6 +14,7 @@
     type ProjectEditOpenHandler,
     type ResolveHandler,
     type SectionAddHandler,
+    type SectionDeleteHandler,
     type SectionRenameHandler,
     type SubtaskAddHandler,
     type SubtaskEditHandler,
@@ -58,6 +59,8 @@
     onTaskAdd?: TaskAddHandler;
     /** Slice 6i — `+ Add Section` placeholder on Board and List. */
     onSectionAdd?: SectionAddHandler;
+    /** Slice 6j — `×` on empty section headers (Board + List). */
+    onSectionDelete?: SectionDeleteHandler;
   }
 
   const {
@@ -82,6 +85,7 @@
     onTaskUnresolve,
     onTaskAdd,
     onSectionAdd,
+    onSectionDelete,
   }: Props = $props();
 
   let active = $state<TabKey>('board');
@@ -110,6 +114,7 @@
   const addProps = $derived({
     ...(onTaskAdd ? { onTaskAdd } : {}),
     ...(onSectionAdd ? { onSectionAdd } : {}),
+    ...(onSectionDelete ? { onSectionDelete } : {}),
   });
   const boardMoveProps = $derived({
     ...(onTaskMove ? { onTaskMove } : {}),
@@ -124,9 +129,10 @@
     ...(onResolve ? { onResolve } : {}),
     ...editProps,
     ...archiveProps,
-    // List view exposes only `onSectionAdd` from the add bag — per the
-    // prototype, only the Board has a per-column `+ Add task`.
+    // List view exposes section-level adds but not per-column `+ Add
+    // task` — matches the prototype (only the Board carries that).
     ...(onSectionAdd ? { onSectionAdd } : {}),
+    ...(onSectionDelete ? { onSectionDelete } : {}),
   });
 </script>
 

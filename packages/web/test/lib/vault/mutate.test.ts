@@ -5,6 +5,7 @@ import {
   addSection,
   addSubtask,
   addTaskToSection,
+  deleteSection,
   allProjects,
   cycleTaskPriority,
   deleteTask,
@@ -559,5 +560,35 @@ describe('addSection (slice 6i)', () => {
     const result = addSection(v, 'ACTIVE');
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe('collision');
+  });
+});
+
+describe('deleteSection (slice 6j)', () => {
+  it('removes an empty section from the vault', () => {
+    const v: Vault = {
+      prelude: '',
+      sections: [
+        { id: 'active', name: 'Active', tasks: [task('a', 'A')] },
+        { id: 'done', name: 'Done', tasks: [] },
+      ],
+    };
+    const result = deleteSection(v, 'done');
+    expect(result.ok).toBe(true);
+    expect(v.sections.map((s) => s.id)).toEqual(['active']);
+  });
+
+  it('refuses with reason=not-empty when the section still has tasks', () => {
+    const v = vault();
+    const result = deleteSection(v, 'active');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('not-empty');
+    expect(v.sections.map((s) => s.id)).toEqual(['active', 'done']);
+  });
+
+  it('returns reason=not-found for unknown sections', () => {
+    const v = vault();
+    const result = deleteSection(v, 'ghost');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('not-found');
   });
 });

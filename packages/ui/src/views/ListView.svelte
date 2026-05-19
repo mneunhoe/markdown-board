@@ -13,6 +13,7 @@
     PriorityCycleHandler,
     ProjectEditOpenHandler,
     SectionAddHandler,
+    SectionDeleteHandler,
     SectionRenameHandler,
     SubtaskAddHandler,
     SubtaskEditHandler,
@@ -57,6 +58,12 @@
     onTaskUnresolve?: TaskUnresolveHandler;
     /** Slice 6i — `+ Add Section` row at the bottom of the list view. */
     onSectionAdd?: SectionAddHandler;
+    /**
+     * Slice 6j — when provided AND a section has zero open tasks AND
+     * zero archived refs, render a hover-revealed `×` next to its
+     * count badge.
+     */
+    onSectionDelete?: SectionDeleteHandler;
   }
 
   const {
@@ -79,12 +86,20 @@
     archivedTasksBySection = {},
     onTaskUnresolve,
     onSectionAdd,
+    onSectionDelete,
   }: Props = $props();
 
   const hasSections = $derived(vault.sections.length > 0);
   const taskDndEnabled = $derived(onTaskMove !== undefined);
   const renameable = $derived(onSectionRename !== undefined);
   const sectionAddable = $derived(onSectionAdd !== undefined);
+  const sectionDeletable = $derived(onSectionDelete !== undefined);
+
+  function isDeletable(sectionId: string, openCount: number): boolean {
+    if (!sectionDeletable) return false;
+    if (openCount > 0) return false;
+    return (archivedTasksBySection[sectionId]?.length ?? 0) === 0;
+  }
 
   // Slice 6i — "+ Add Section" inline editor.
   let addingSection = $state(false);
@@ -194,6 +209,16 @@
           <span class="count" aria-label="{section.tasks.length} tasks">
             {section.tasks.length}
           </span>
+          {#if isDeletable(section.id, section.tasks.length)}
+            <button
+              type="button"
+              class="list-section-delete-btn"
+              aria-label="Delete empty section {section.name}"
+              title="Delete empty section"
+              data-testid="list-section-delete"
+              onclick={() => onSectionDelete?.(section.id)}>×</button
+            >
+          {/if}
         </header>
         <div class="list-tasks">
           {#each section.tasks as task, taskIdx (task.id || `${section.id}:${task.title}`)}
@@ -446,6 +471,34 @@
   }
   :global(.list-task-slot[data-drop-edge='bottom']::before) {
     bottom: 5px;
+  }
+
+  .list-section-delete-btn {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0;
+    width: 18px;
+    height: 18px;
+    line-height: 1;
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-left: 6px;
+    opacity: 0;
+    transition:
+      opacity 0.1s ease,
+      color 0.1s ease;
+  }
+
+  .list-section:hover .list-section-delete-btn,
+  .list-section-delete-btn:focus-visible {
+    opacity: 1;
+  }
+
+  .list-section-delete-btn:hover {
+    color: var(--priority-high, #c0392b);
   }
 
   .list-add-section-btn {

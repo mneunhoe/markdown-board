@@ -34,6 +34,7 @@ export {
   type PriorityCycleHandler,
   type ProjectEditOpenHandler,
   type SectionAddHandler,
+  type SectionDeleteHandler,
   type SectionRenameHandler,
   type SubtaskAddHandler,
   type SubtaskEditHandler,

@@ -13,6 +13,7 @@
     type ProjectEditOpenHandler,
     type ResolveHandler,
     type SectionAddHandler,
+    type SectionDeleteHandler,
     type SectionRenameHandler,
     type SubtaskAddHandler,
     type SubtaskEditHandler,
@@ -43,6 +44,7 @@
     allProjects,
     appendArchiveEntry,
     cycleTaskPriority,
+    deleteSection,
     deleteTask,
     findTask,
     isFileSystemAccessSupported,
@@ -254,6 +256,19 @@
           ? `Couldn't add section: a section named "${name}" already exists.`
           : "Couldn't add section: the name can't be empty.";
     } else if (error?.startsWith("Couldn't add section")) {
+      error = null;
+    }
+  };
+
+  const onSectionDelete: SectionDeleteHandler = (sectionId) => {
+    if (!loaded) return;
+    const result = deleteSection(loaded.vault, sectionId);
+    if (!result.ok) {
+      error =
+        result.reason === 'not-empty'
+          ? "Couldn't delete section: it still has tasks."
+          : "Couldn't delete section: it doesn't exist anymore.";
+    } else if (error?.startsWith("Couldn't delete section")) {
       error = null;
     }
   };
@@ -512,6 +527,7 @@
         {onTaskUnresolve}
         {onTaskAdd}
         {onSectionAdd}
+        {onSectionDelete}
       />
     {:else if !supported}
       <EmptyState

@@ -13,6 +13,7 @@
     PriorityCycleHandler,
     ProjectEditOpenHandler,
     SectionAddHandler,
+    SectionDeleteHandler,
     SectionRenameHandler,
     SubtaskAddHandler,
     SubtaskEditHandler,
@@ -82,6 +83,12 @@
      * board. Omitted ⇒ the placeholder is not rendered.
      */
     onSectionAdd?: SectionAddHandler;
+    /**
+     * Slice 6j — when provided, each Column gets a hover-revealed `×`
+     * button on its header, but only when the section has zero open
+     * tasks AND zero archived refs (Column enforces the visibility).
+     */
+    onSectionDelete?: SectionDeleteHandler;
   }
 
   const {
@@ -106,6 +113,7 @@
     onTaskUnresolve,
     onTaskAdd,
     onSectionAdd,
+    onSectionDelete,
   }: Props = $props();
 
   const hasSections = $derived(vault.sections.length > 0);
@@ -179,6 +187,7 @@
               }
             : {}}
           {...onTaskAdd ? { onAddTask: (title: string) => onTaskAdd(section.id, title) } : {}}
+          {...onSectionDelete ? { onDelete: () => onSectionDelete(section.id) } : {}}
         >
           {#each section.tasks as task, taskIdx (task.id || `${section.id}:${task.title}`)}
             <div

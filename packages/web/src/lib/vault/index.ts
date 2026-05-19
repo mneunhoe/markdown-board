@@ -14,6 +14,7 @@ export {
   addTaskToSection,
   allProjects,
   cycleTaskPriority,
+  deleteSection,
   deleteTask,
   ensureUniqueTaskIds,
   moveColumn,
@@ -29,6 +30,7 @@ export {
   toggleSubtask,
   type AddSectionResult,
   type ColumnMove,
+  type DeleteSectionResult,
   type TaskMove,
   type TaskTarget,
 } from './mutate.js';

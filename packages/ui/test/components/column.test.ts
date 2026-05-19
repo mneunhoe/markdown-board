@@ -215,4 +215,56 @@ describe('Column', () => {
       expect(onAddTask).not.toHaveBeenCalled();
     });
   });
+
+  describe('onDelete (slice 6j)', () => {
+    it('without onDelete, no × button is rendered', () => {
+      const { container } = render(Column, { name: 'Active', count: 0 });
+      expect(container.querySelector('[data-testid="column-delete"]')).toBeNull();
+    });
+
+    it('with onDelete on a truly empty column, × is rendered', () => {
+      const { container } = render(Column, { name: 'Active', count: 0, onDelete: () => {} });
+      expect(container.querySelector('[data-testid="column-delete"]')).toBeTruthy();
+    });
+
+    it('hides × when the column has open tasks (count > 0)', () => {
+      const { container } = render(Column, { name: 'Active', count: 1, onDelete: () => {} });
+      expect(container.querySelector('[data-testid="column-delete"]')).toBeNull();
+    });
+
+    it('hides × when the column has archived refs', () => {
+      const { container } = render(Column, {
+        name: 'Active',
+        count: 0,
+        onDelete: () => {},
+        archivedTasks: [
+          {
+            task: {
+              id: 'a',
+              checked: true,
+              title: 'Old',
+              note: '',
+              resolution: '',
+              priority: null,
+              project: null,
+              day: null,
+              pomodoros: 0,
+              subtasks: [],
+            },
+            archivedAt: '2026-05-18 10:00',
+          },
+        ],
+      });
+      expect(container.querySelector('[data-testid="column-delete"]')).toBeNull();
+    });
+
+    it('clicking × fires onDelete', async () => {
+      const onDelete = vi.fn();
+      const { container } = render(Column, { name: 'Active', count: 0, onDelete });
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="column-delete"]')!,
+      );
+      expect(onDelete).toHaveBeenCalledOnce();
+    });
+  });
 });

@@ -32,6 +32,14 @@
      * `dashboard.html:3303-3338`.
      */
     onAddTask?: (title: string) => void;
+    /**
+     * Slice 6j — when provided AND the column has zero open tasks AND
+     * zero archived refs, render a hover-revealed `×` next to the
+     * count badge. Clicking it deletes the section. The UI hides the
+     * affordance for non-empty sections; the host's `deleteSection`
+     * helper also refuses defensively.
+     */
+    onDelete?: () => void;
   }
 
   const {
@@ -42,9 +50,11 @@
     archivedTasks = [],
     onUnresolveArchived,
     onAddTask,
+    onDelete,
   }: Props = $props();
   const renameable = $derived(onRename !== undefined);
   const addable = $derived(onAddTask !== undefined);
+  const deletable = $derived(onDelete !== undefined && count === 0 && archivedTasks.length === 0);
 
   let editing = $state(false);
   let editValue = $state('');
@@ -134,6 +144,16 @@
       <span class="column-title">{name}</span>
     {/if}
     <span class="count" aria-label="{count} tasks">{count}</span>
+    {#if deletable}
+      <button
+        type="button"
+        class="delete-section-btn"
+        aria-label="Delete empty section {name}"
+        title="Delete empty section"
+        data-testid="column-delete"
+        onclick={() => onDelete?.()}>×</button
+      >
+    {/if}
   </header>
   <div class="cards">
     {@render children?.()}
@@ -235,6 +255,34 @@
     color: var(--text-muted);
     flex-shrink: 0;
     margin-left: 8px;
+  }
+
+  .delete-section-btn {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0;
+    width: 18px;
+    height: 18px;
+    line-height: 1;
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-left: 6px;
+    opacity: 0;
+    transition:
+      opacity 0.1s ease,
+      color 0.1s ease;
+  }
+
+  .column:hover .delete-section-btn,
+  .delete-section-btn:focus-visible {
+    opacity: 1;
+  }
+
+  .delete-section-btn:hover {
+    color: var(--priority-high, #c0392b);
   }
 
   .cards {

@@ -272,6 +272,31 @@ export type AddSectionResult =
   | { ok: true; id: string }
   | { ok: false; reason: 'empty' | 'collision' };
 
+export type DeleteSectionResult = { ok: true } | { ok: false; reason: 'not-found' | 'not-empty' };
+
+/**
+ * Remove a section from the vault by id. Refuses when the section
+ * still carries open tasks (`tasks.length > 0`) — the caller is
+ * expected to hide the affordance in that case; this defensive check
+ * exists in case the helper is invoked from a non-UI surface (future
+ * command palette / API).
+ *
+ * Note: this helper only inspects the active vault. Archived tasks
+ * whose source-section name matched the deleted column become
+ * "orphaned" in `archive/TASKS.md` (no matching active section) and
+ * are folded under the first active column by the slice 6g-3 grouping
+ * derivation. The UI hides the delete affordance when the column has
+ * any archived refs too, so this normally won't fire in practice.
+ */
+export function deleteSection(vault: Vault, sectionId: string): DeleteSectionResult {
+  const idx = vault.sections.findIndex((s) => s.id === sectionId);
+  if (idx === -1) return { ok: false, reason: 'not-found' };
+  const section = vault.sections[idx]!;
+  if (section.tasks.length > 0) return { ok: false, reason: 'not-empty' };
+  vault.sections.splice(idx, 1);
+  return { ok: true };
+}
+
 /**
  * Append a new section to the end of the vault. Mirrors
  * `startAddingSection` (`dashboard.html:4560-4592`). Name is trimmed;

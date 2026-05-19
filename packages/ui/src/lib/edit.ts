@@ -71,3 +71,9 @@ export type TaskAddHandler = (sectionId: string, title: string) => void;
 // Add a new section (column) to the vault. Trimmed name in; the host
 // shell decides what id to mint and whether to reject collisions.
 export type SectionAddHandler = (name: string) => void;
+
+// Slice 6j — delete an empty section. The UI hides the affordance
+// when the section carries any open or archived tasks; the handler
+// is therefore only ever invoked for sections that *are* empty at
+// click time.
+export type SectionDeleteHandler = (sectionId: string) => void;
