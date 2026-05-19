@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { ARCHIVE_HEADER, appendToArchive, buildArchiveEntry } from '../../src/grammar/archive.js';
+import { parseTasks } from '../../src/grammar/tasks.js';
 import type { Section, Task } from '../../src/grammar/types.js';
 
 const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
@@ -28,9 +29,10 @@ function makeSection(name = 'Active'): Section {
 
 const NOW = new Date(2026, 4, 18, 10, 43);
 
-describe('buildArchiveEntry — canonical shape (§6.2 / dashboard.html:3616-3660)', () => {
-  it('emits every block when all fields are populated', () => {
+describe('buildArchiveEntry — task-grammar shape (slice 6f)', () => {
+  it('emits a `## YYYY-MM-DD HH:MM — SectionName` header followed by a regular `- [x]` task line', () => {
     const task = makeTask({
+      id: 'abc12345',
       title: 'Ship release',
       note: 'tagging v0.1.0',
       priority: 'high',
@@ -46,168 +48,143 @@ describe('buildArchiveEntry — canonical shape (§6.2 / dashboard.html:3616-366
     expect(entry).toBe(
       [
         '',
-        '## 2026-05-18 10:43 — Ship release',
+        '## 2026-05-18 10:43 — Active',
         '',
-        '**Resolution:**',
-        '',
-        'Tagged and pushed.',
-        '',
-        '*section=Active · project=markdown-board · priority=high · day=Mon · pomodoros=2*',
-        '',
-        '**Original note:** tagging v0.1.0',
-        '',
-        '**Subtasks:**',
-        '- [x] done one',
-        '- [ ] skipped two',
-        '',
-        '---',
+        '- [x] **[P1] [project:markdown-board] [Mon] [pom:2] Ship release** - Tagged and pushed. · tagging v0.1.0 <!-- id:abc12345 -->',
+        '  - [x] done one',
+        '  - [ ] skipped two',
       ].join('\n'),
     );
   });
 
-  it('uses ` — ` (em-dash with surrounding spaces) between timestamp and title', () => {
-    const entry = buildArchiveEntry(makeTask({ title: 'T' }), '', makeSection(), { now: NOW });
-    expect(entry).toContain('## 2026-05-18 10:43 — T');
-  });
-
-  it('terminates with a `---` thematic break (entry boundary)', () => {
-    const entry = buildArchiveEntry(makeTask(), '', makeSection(), { now: NOW });
-    expect(entry.endsWith('\n---')).toBe(true);
-  });
-
-  it('starts with a leading blank line so concatenation gives a clean H2 boundary', () => {
+  it('starts with a leading blank line so concatenation produces a clean H2 boundary', () => {
     const entry = buildArchiveEntry(makeTask(), '', makeSection(), { now: NOW });
     expect(entry.startsWith('\n## ')).toBe(true);
   });
-});
 
-describe('buildArchiveEntry — resolution body (§15.1 / Q15)', () => {
-  it('emits **Resolution:** + trimmed body when present', () => {
-    const entry = buildArchiveEntry(makeTask(), '  body  ', makeSection(), { now: NOW });
-    expect(entry).toContain('**Resolution:**\n\nbody\n');
-  });
-
-  it('emits *(no resolution note)* when resolution is empty', () => {
+  it('does NOT end with a trailing newline (appendToArchive adds one)', () => {
     const entry = buildArchiveEntry(makeTask(), '', makeSection(), { now: NOW });
-    expect(entry).toContain('*(no resolution note)*');
-    expect(entry).not.toContain('**Resolution:**');
+    expect(entry.endsWith('\n')).toBe(false);
   });
 
-  it('treats whitespace-only resolution as empty', () => {
-    const entry = buildArchiveEntry(makeTask(), '   \n  ', makeSection(), { now: NOW });
-    expect(entry).toContain('*(no resolution note)*');
-    expect(entry).not.toContain('**Resolution:**');
+  it('the H2 carries the original section name (preserves context for the Done-column merge)', () => {
+    const entry = buildArchiveEntry(makeTask(), '', makeSection('Doing'), { now: NOW });
+    expect(entry).toContain('## 2026-05-18 10:43 — Doing');
   });
 
-  it('preserves internal Markdown in the resolution verbatim (Q15)', () => {
-    const entry = buildArchiveEntry(makeTask(), '## hijacked\n- item\n> quote', makeSection(), {
-      now: NOW,
-    });
-    expect(entry).toContain('**Resolution:**\n\n## hijacked\n- item\n> quote\n');
-  });
-});
-
-describe('buildArchiveEntry — metadata line (`*section=… · project=… · …*`)', () => {
-  it('joins fields with ` · ` (space middle-dot space) inside `*…*`', () => {
-    const task = makeTask({ priority: 'high', day: 'Mon', pomodoros: 2 });
-    const entry = buildArchiveEntry(task, '', makeSection(), { now: NOW });
-    expect(entry).toContain('*section=Active · priority=high · day=Mon · pomodoros=2*');
-  });
-
-  it('omits the metadata line entirely when no fields are populated', () => {
-    const task = makeTask();
-    const entry = buildArchiveEntry(task, '', { id: '', name: '', tasks: [] }, { now: NOW });
-    expect(entry).not.toMatch(/\*section=|\*project=|\*priority=|\*day=|\*pomodoros=/);
-  });
-
-  it('omits `section=` when section.name is empty', () => {
+  it('omits the ` — Section` suffix when section.name is empty', () => {
     const entry = buildArchiveEntry(
-      makeTask({ priority: 'high' }),
+      makeTask({ title: 'T' }),
       '',
       { id: '', name: '', tasks: [] },
       { now: NOW },
     );
-    expect(entry).toContain('*priority=high*');
-    expect(entry).not.toContain('section=');
+    expect(entry).toContain('## 2026-05-18 10:43\n');
+    expect(entry).not.toContain('—');
   });
 
-  it('omits `project=` when task.project is null', () => {
-    const entry = buildArchiveEntry(makeTask({ priority: 'high' }), '', makeSection(), {
-      now: NOW,
-    });
-    expect(entry).not.toContain('project=');
+  it('flips `checked` to true regardless of the input task state', () => {
+    const entry = buildArchiveEntry(makeTask({ checked: false }), '', makeSection(), { now: NOW });
+    expect(entry).toContain('- [x] **Title**');
   });
 
-  it('omits `priority=` when task.priority is null', () => {
-    const entry = buildArchiveEntry(makeTask({ day: 'Mon' }), '', makeSection(), { now: NOW });
-    expect(entry).not.toContain('priority=');
-  });
-
-  it('omits `day=` when task.day is null', () => {
-    const entry = buildArchiveEntry(makeTask({ priority: 'low' }), '', makeSection(), {
-      now: NOW,
-    });
-    expect(entry).not.toContain('day=');
-  });
-
-  it('omits `pomodoros=` when pomodoros is 0', () => {
-    const entry = buildArchiveEntry(
-      makeTask({ pomodoros: 0, priority: 'high' }),
-      '',
-      makeSection(),
-      {
-        now: NOW,
-      },
-    );
-    expect(entry).not.toContain('pomodoros=');
-  });
-
-  it('includes pomodoros when count is positive', () => {
-    const entry = buildArchiveEntry(makeTask({ pomodoros: 5 }), '', makeSection(), { now: NOW });
-    expect(entry).toContain('· pomodoros=5*');
-  });
-
-  it('preserves the canonical field order: section, project, priority, day, pomodoros', () => {
+  it('round-trips through parseTasks as one task in one section', () => {
     const task = makeTask({
-      project: 'Foo',
-      priority: 'blocker',
-      day: 'Fri',
+      id: 'abc12345',
+      title: 'Ship',
+      priority: 'high',
+      project: 'foo',
+      day: 'Tue',
       pomodoros: 3,
+      subtasks: [{ text: 'a', checked: true }],
     });
-    const entry = buildArchiveEntry(task, '', makeSection('Doing'), { now: NOW });
-    expect(entry).toContain(
-      '*section=Doing · project=Foo · priority=blocker · day=Fri · pomodoros=3*',
-    );
+    const entry = buildArchiveEntry(task, 'done', makeSection('Done'), { now: NOW });
+    const parsed = parseTasks(entry.trimStart());
+    expect(parsed.sections).toHaveLength(1);
+    const section = parsed.sections[0]!;
+    expect(section.name).toBe('2026-05-18 10:43 — Done');
+    expect(section.tasks).toHaveLength(1);
+    const round = section.tasks[0]!;
+    expect(round.checked).toBe(true);
+    expect(round.title).toBe('Ship');
+    expect(round.priority).toBe('high');
+    expect(round.project).toBe('foo');
+    expect(round.day).toBe('Tue');
+    expect(round.pomodoros).toBe(3);
+    expect(round.note).toBe('done');
+    expect(round.subtasks).toEqual([{ text: 'a', checked: true }]);
+    expect(round.id).toBe('abc12345');
   });
 });
 
-describe('buildArchiveEntry — original note', () => {
-  it('emits `**Original note:** …` inline when present', () => {
-    const task = makeTask({ note: 'background context' });
-    const entry = buildArchiveEntry(task, '', makeSection(), { now: NOW });
-    expect(entry).toContain('**Original note:** background context');
+describe('buildArchiveEntry — note merge (resolution + original)', () => {
+  it('uses just the resolution when the task has no note', () => {
+    const entry = buildArchiveEntry(makeTask(), 'done', makeSection(), { now: NOW });
+    expect(entry).toContain('- [x] **Title** - done');
   });
 
-  it('omits the note line entirely when task.note is empty', () => {
+  it('uses just the original note when the resolution is empty', () => {
+    const entry = buildArchiveEntry(makeTask({ note: 'context' }), '', makeSection(), { now: NOW });
+    expect(entry).toContain('- [x] **Title** - context');
+  });
+
+  it('emits no note suffix when both are empty', () => {
     const entry = buildArchiveEntry(makeTask(), '', makeSection(), { now: NOW });
-    expect(entry).not.toContain('**Original note:**');
+    expect(entry).toMatch(/- \[x\] \*\*Title\*\*$/);
+    expect(entry).not.toMatch(/\*\* - /);
   });
 
-  it('treats whitespace-only note as empty', () => {
-    const entry = buildArchiveEntry(makeTask({ note: '   ' }), '', makeSection(), { now: NOW });
-    expect(entry).not.toContain('**Original note:**');
-  });
-
-  it('trims surrounding whitespace from the note body', () => {
-    const entry = buildArchiveEntry(makeTask({ note: '  trimmed  ' }), '', makeSection(), {
+  it('joins resolution (first) and original note (second) with ` · ` when both are present', () => {
+    const entry = buildArchiveEntry(makeTask({ note: 'context' }), 'done', makeSection(), {
       now: NOW,
     });
-    expect(entry).toContain('**Original note:** trimmed');
+    expect(entry).toContain('- [x] **Title** - done · context');
+  });
+
+  it('collapses multi-line resolutions with ` · ` separators', () => {
+    const entry = buildArchiveEntry(makeTask(), 'line one\nline two\nline three', makeSection(), {
+      now: NOW,
+    });
+    expect(entry).toContain('- [x] **Title** - line one · line two · line three');
+  });
+
+  it('drops blank lines inside multi-line input before joining', () => {
+    const entry = buildArchiveEntry(makeTask(), 'one\n\n\ntwo', makeSection(), { now: NOW });
+    expect(entry).toContain('- [x] **Title** - one · two');
+  });
+
+  it('trims surrounding whitespace from each line', () => {
+    const entry = buildArchiveEntry(makeTask(), '  one  \n  two  ', makeSection(), { now: NOW });
+    expect(entry).toContain('- [x] **Title** - one · two');
+  });
+});
+
+describe('buildArchiveEntry — tokens are written in canonical order', () => {
+  it('order: [P*] [project:…] [Day] [pom:N] (matches active task grammar)', () => {
+    const task = makeTask({
+      title: 'X',
+      priority: 'blocker',
+      project: 'Foo',
+      day: 'Fri',
+      pomodoros: 3,
+    });
+    const entry = buildArchiveEntry(task, '', makeSection(), { now: NOW });
+    expect(entry).toContain('**[P0] [project:Foo] [Fri] [pom:3] X**');
+  });
+
+  it('omits absent tokens', () => {
+    const entry = buildArchiveEntry(makeTask({ title: 'X', priority: 'low' }), '', makeSection(), {
+      now: NOW,
+    });
+    expect(entry).toContain('**[P3] X**');
+    expect(entry).not.toContain('project:');
+    expect(entry).not.toContain('[Mon]');
+    expect(entry).not.toContain('pom:');
   });
 });
 
 describe('buildArchiveEntry — subtasks', () => {
-  it('renders `[x]` for checked and `[ ]` for unchecked subtasks', () => {
+  it('renders subtasks as two-space-indented task lines (matches active TASKS.md grammar)', () => {
     const task = makeTask({
       subtasks: [
         { text: 'a', checked: true },
@@ -215,31 +192,46 @@ describe('buildArchiveEntry — subtasks', () => {
       ],
     });
     const entry = buildArchiveEntry(task, '', makeSection(), { now: NOW });
-    expect(entry).toContain('**Subtasks:**\n- [x] a\n- [ ] b\n');
+    expect(entry).toMatch(/^ {2}- \[x\] a$/m);
+    expect(entry).toMatch(/^ {2}- \[ \] b$/m);
   });
 
-  it('omits the **Subtasks:** block entirely when no subtasks', () => {
+  it('emits no subtask lines when the task has none', () => {
     const entry = buildArchiveEntry(makeTask(), '', makeSection(), { now: NOW });
-    expect(entry).not.toContain('**Subtasks:**');
+    expect(entry.split('\n').filter((l) => /^ {2}- \[/.test(l))).toEqual([]);
+  });
+});
+
+describe('buildArchiveEntry — id round-trip', () => {
+  it('keeps the original `<!-- id:… -->` suffix when present', () => {
+    const entry = buildArchiveEntry(makeTask({ id: 'feedbeef' }), '', makeSection(), { now: NOW });
+    expect(entry).toContain('<!-- id:feedbeef -->');
+  });
+
+  it('omits the id suffix when the task has no id', () => {
+    const entry = buildArchiveEntry(makeTask({ id: '' }), '', makeSection(), { now: NOW });
+    expect(entry).not.toContain('<!-- id:');
   });
 });
 
 describe('buildArchiveEntry — line endings (Q4)', () => {
   it('normalises CRLF in the title to LF', () => {
     const entry = buildArchiveEntry(makeTask({ title: 'A\r\nB' }), '', makeSection(), { now: NOW });
-    expect(entry).toContain('## 2026-05-18 10:43 — A\nB');
+    expect(entry).not.toContain('\r');
   });
 
-  it('normalises CRLF in the resolution body to LF', () => {
+  it('normalises CRLF in the resolution input to LF before collapse', () => {
     const entry = buildArchiveEntry(makeTask(), 'one\r\ntwo', makeSection(), { now: NOW });
-    expect(entry).toContain('**Resolution:**\n\none\ntwo\n');
+    expect(entry).toContain('- [x] **Title** - one · two');
+    expect(entry).not.toContain('\r');
   });
 
   it('normalises CRLF in the original note to LF', () => {
     const entry = buildArchiveEntry(makeTask({ note: 'one\r\ntwo' }), '', makeSection(), {
       now: NOW,
     });
-    expect(entry).toContain('**Original note:** one\ntwo');
+    expect(entry).toContain('one · two');
+    expect(entry).not.toContain('\r');
   });
 
   it('normalises CRLF in subtask text to LF', () => {
@@ -249,42 +241,27 @@ describe('buildArchiveEntry — line endings (Q4)', () => {
       makeSection(),
       { now: NOW },
     );
-    expect(entry).toContain('- [ ] one\ntwo');
-  });
-
-  it('output is LF-only (no `\\r` anywhere)', () => {
-    const entry = buildArchiveEntry(
-      makeTask({
-        title: 'a\r\nb',
-        note: 'n\r\no',
-        subtasks: [{ text: 's\r\nt', checked: false }],
-      }),
-      'r\r\nb',
-      makeSection(),
-      { now: NOW },
-    );
     expect(entry).not.toContain('\r');
   });
 });
 
-describe('buildArchiveEntry — timestamp format (dashboard.html:3605-3608)', () => {
+describe('buildArchiveEntry — timestamp format', () => {
   it('formats as `YYYY-MM-DD HH:MM` zero-padded', () => {
     const entry = buildArchiveEntry(makeTask(), '', makeSection(), {
       now: new Date(2024, 0, 3, 4, 5),
     });
-    expect(entry).toContain('## 2024-01-03 04:05 — Title');
+    expect(entry).toContain('## 2024-01-03 04:05 — Active');
   });
 
   it('uses local time, no timezone marker', () => {
     const entry = buildArchiveEntry(makeTask(), '', makeSection(), { now: NOW });
-    // No `Z`, `+`, `T`, etc. in the timestamp portion.
-    expect(entry).toMatch(/## \d{4}-\d{2}-\d{2} \d{2}:\d{2} — /);
+    expect(entry).toMatch(/## \d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
     expect(entry).not.toMatch(/\d{2}:\d{2}[ZT+]/);
   });
 
   it('defaults `now` to the wall clock when no option is provided', () => {
     const entry = buildArchiveEntry(makeTask(), '', makeSection());
-    expect(entry).toMatch(/## \d{4}-\d{2}-\d{2} \d{2}:\d{2} — Title/);
+    expect(entry).toMatch(/## \d{4}-\d{2}-\d{2} \d{2}:\d{2} — Active/);
   });
 });
 
@@ -303,7 +280,7 @@ describe('appendToArchive — first-write header path', () => {
     expect(out.startsWith(ARCHIVE_HEADER)).toBe(true);
   });
 
-  it('ARCHIVE_HEADER matches the prototype byte-for-byte (dashboard.html:3680)', () => {
+  it('ARCHIVE_HEADER preserves the original prelude (still tolerant to parseTasks)', () => {
     expect(ARCHIVE_HEADER).toBe(
       '# Archived Tasks\n\nResolved tasks moved out of `TASKS.md` by the dashboard.\n',
     );
@@ -312,7 +289,7 @@ describe('appendToArchive — first-write header path', () => {
 
 describe('appendToArchive — append path', () => {
   it('appends to non-empty existing content with a trailing `\\n`', () => {
-    const existing = `${ARCHIVE_HEADER}\n## 2026-05-17 09:00 — Old\n\n*(no resolution note)*\n\n---\n`;
+    const existing = `${ARCHIVE_HEADER}\n## 2026-05-17 09:00 — Active\n\n- [x] **Old**\n`;
     const entry = buildArchiveEntry(makeTask({ title: 'New' }), '', makeSection(), { now: NOW });
     const out = appendToArchive(existing, entry);
     expect(out).toBe(`${existing}${entry}\n`);
@@ -335,7 +312,7 @@ describe('appendToArchive — append path', () => {
   });
 
   it('preserves earlier entries byte-for-byte (append-only contract)', () => {
-    const earlier = `${ARCHIVE_HEADER}\n## 2026-05-17 09:00 — A\n\n*(no resolution note)*\n\n---\n`;
+    const earlier = `${ARCHIVE_HEADER}\n## 2026-05-17 09:00 — Active\n\n- [x] **A**\n`;
     const entry = buildArchiveEntry(makeTask({ title: 'B' }), 'note', makeSection(), {
       now: NOW,
     });
@@ -344,16 +321,13 @@ describe('appendToArchive — append path', () => {
   });
 });
 
-describe('appendToArchive — golden file (claude_life/archive/TASKS.md)', () => {
+describe('appendToArchive — golden file (new task-grammar format)', () => {
   it('reproduces the on-disk archive byte-for-byte from a first-write', () => {
     const fixture = readFileSync(join(fixturesDir, 'archive-tasks.md'), 'utf8');
 
     const task = makeTask({
+      id: '04c6b021',
       title: "Confirm the date of Xiao-Li Meng's R&R letter",
-      // The prototype parser leaves leading em-dash in the note body
-      // (parseTasks strips a leading `- ` only, not `— `). The on-disk
-      // archive entry preserves the em-dash, so the test reproduces that
-      // exact shape.
       note: '— the six-week deadline runs from that date. Find the email and compute the resubmission deadline.',
       priority: 'high',
       project: 'ADA-HDSR — revised proposal (six-week clock)',

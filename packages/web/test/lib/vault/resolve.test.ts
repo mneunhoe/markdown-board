@@ -82,7 +82,7 @@ describe('removeTask', () => {
 });
 
 describe('appendArchiveEntry', () => {
-  it('writes a brand-new archive file with the §6.2 header', async () => {
+  it('writes a brand-new archive file with the task-grammar header (slice 6f)', async () => {
     const adapter = new InMemoryAdapter({});
     const t = task('a', { title: 'Write spec' });
     const section = { id: 'active', name: 'Active', tasks: [t] };
@@ -91,10 +91,8 @@ describe('appendArchiveEntry', () => {
     });
     const written = await adapter.readFile(ARCHIVE_PATH);
     expect(written).toMatch(/^# Archived Tasks\n/);
-    expect(written).toMatch(/## 2026-01-15 14:30 — Write spec/);
-    expect(written).toMatch(/\*\*Resolution:\*\*/);
-    expect(written).toContain('Shipped it');
-    expect(written).toMatch(/section=Active/);
+    expect(written).toMatch(/## 2026-01-15 14:30 — Active/);
+    expect(written).toContain('- [x] **Write spec** - Shipped it');
   });
 
   it('appends to an existing archive file without re-emitting the header', async () => {
@@ -114,9 +112,9 @@ describe('appendArchiveEntry', () => {
     const written = await adapter.readFile(ARCHIVE_PATH);
     // Header only appears once.
     expect(written.match(/# Archived Tasks/g)).toHaveLength(1);
-    expect(written).toMatch(/## 2026-01-16 09:00 — Second resolve/);
-    // Empty resolution renders as the *(no resolution note)* sentinel.
-    expect(written).toMatch(/\*\(no resolution note\)\*/);
+    expect(written).toMatch(/## 2026-01-16 09:00 — Active/);
+    // Empty resolution leaves no note suffix on the task line.
+    expect(written).toMatch(/- \[x\] \*\*Second resolve\*\* <!-- id:a -->/);
   });
 
   it('treats missing archive file as empty (lays down the header)', async () => {
@@ -127,7 +125,7 @@ describe('appendArchiveEntry', () => {
     expect(written).toMatch(/^# Archived Tasks\n/);
   });
 
-  it('includes task metadata (project / priority / day / pomodoros) in the entry', async () => {
+  it('encodes task tokens inline on the - [x] line (slice 6f)', async () => {
     const adapter = new InMemoryAdapter({});
     const t = task('a', {
       title: 'Big one',
@@ -146,9 +144,6 @@ describe('appendArchiveEntry', () => {
       },
     );
     const written = await adapter.readFile(ARCHIVE_PATH);
-    expect(written).toMatch(/project=PSD_GAN/);
-    expect(written).toMatch(/priority=high/);
-    expect(written).toMatch(/day=Wed/);
-    expect(written).toMatch(/pomodoros=3/);
+    expect(written).toContain('- [x] **[P1] [project:PSD_GAN] [Wed] [pom:3] Big one**');
   });
 });
