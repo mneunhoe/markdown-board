@@ -12,10 +12,12 @@
     type PriorityCycleHandler,
     type ProjectEditOpenHandler,
     type ResolveHandler,
+    type SectionAddHandler,
     type SectionRenameHandler,
     type SubtaskAddHandler,
     type SubtaskEditHandler,
     type SubtaskToggleHandler,
+    type TaskAddHandler,
     type TaskDeleteHandler,
     type TaskMoveHandler,
     type TaskUnresolveHandler,
@@ -35,7 +37,9 @@
     ExternalChangeWatcher,
     FileSystemAccessUnsupportedError,
     VaultPickerCancelledError,
+    addSection,
     addSubtask,
+    addTaskToSection,
     allProjects,
     appendArchiveEntry,
     cycleTaskPriority,
@@ -229,6 +233,27 @@
     if (!ok) {
       error = `Couldn't rename section: a section named "${nextName}" already exists.`;
     } else if (error?.startsWith("Couldn't rename section")) {
+      error = null;
+    }
+  };
+
+  const onTaskAdd: TaskAddHandler = (sectionId, title) => {
+    if (!loaded) return;
+    const id = addTaskToSection(loaded.vault, sectionId, title);
+    if (!id) {
+      error = "Couldn't add the task — the section may have been removed.";
+    }
+  };
+
+  const onSectionAdd: SectionAddHandler = (name) => {
+    if (!loaded) return;
+    const result = addSection(loaded.vault, name);
+    if (!result.ok) {
+      error =
+        result.reason === 'collision'
+          ? `Couldn't add section: a section named "${name}" already exists.`
+          : "Couldn't add section: the name can't be empty.";
+    } else if (error?.startsWith("Couldn't add section")) {
       error = null;
     }
   };
@@ -485,6 +510,8 @@
         {onFullTaskEdit}
         {archivedTasksBySection}
         {onTaskUnresolve}
+        {onTaskAdd}
+        {onSectionAdd}
       />
     {:else if !supported}
       <EmptyState

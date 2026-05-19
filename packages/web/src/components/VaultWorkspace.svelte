@@ -13,10 +13,12 @@
     type PriorityCycleHandler,
     type ProjectEditOpenHandler,
     type ResolveHandler,
+    type SectionAddHandler,
     type SectionRenameHandler,
     type SubtaskAddHandler,
     type SubtaskEditHandler,
     type SubtaskToggleHandler,
+    type TaskAddHandler,
     type TaskDeleteHandler,
     type TaskMoveHandler,
     type TaskUnresolveHandler,
@@ -52,6 +54,10 @@
     archivedTasksBySection?: Record<string, ArchivedTaskRef[]>;
     /** Slice 6g — fires when the user clicks `↺` on an archived card. */
     onTaskUnresolve?: TaskUnresolveHandler;
+    /** Slice 6i — `+ Add task` per Board column. Omitted ⇒ hidden. */
+    onTaskAdd?: TaskAddHandler;
+    /** Slice 6i — `+ Add Section` placeholder on Board and List. */
+    onSectionAdd?: SectionAddHandler;
   }
 
   const {
@@ -74,6 +80,8 @@
     onFullTaskEdit,
     archivedTasksBySection = {},
     onTaskUnresolve,
+    onTaskAdd,
+    onSectionAdd,
   }: Props = $props();
 
   let active = $state<TabKey>('board');
@@ -99,18 +107,26 @@
     archivedTasksBySection,
     ...(onTaskUnresolve ? { onTaskUnresolve } : {}),
   });
+  const addProps = $derived({
+    ...(onTaskAdd ? { onTaskAdd } : {}),
+    ...(onSectionAdd ? { onSectionAdd } : {}),
+  });
   const boardMoveProps = $derived({
     ...(onTaskMove ? { onTaskMove } : {}),
     ...(onColumnMove ? { onColumnMove } : {}),
     ...(onResolve ? { onResolve } : {}),
     ...editProps,
     ...archiveProps,
+    ...addProps,
   });
   const listMoveProps = $derived({
     ...(onTaskMove ? { onTaskMove } : {}),
     ...(onResolve ? { onResolve } : {}),
     ...editProps,
     ...archiveProps,
+    // List view exposes only `onSectionAdd` from the add bag — per the
+    // prototype, only the Board has a per-column `+ Add task`.
+    ...(onSectionAdd ? { onSectionAdd } : {}),
   });
 </script>
 

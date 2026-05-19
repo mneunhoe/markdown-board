@@ -105,4 +105,27 @@ describe('ListView', () => {
       expect(checkbox?.classList.contains('interactive')).toBe(false);
     });
   });
+
+  describe('onSectionAdd (slice 6i)', () => {
+    it('without onSectionAdd, no "+ Add Section" affordance is rendered', () => {
+      const vault = makeVault([makeSection('a', 'Active')]);
+      const { container } = render(ListView, { vault });
+      expect(container.querySelector('[data-testid="list-add-section"]')).toBeNull();
+    });
+
+    it('with onSectionAdd, clicking the button swaps in an input; Enter commits', async () => {
+      const onSectionAdd = vi.fn();
+      const vault = makeVault([makeSection('a', 'Active')]);
+      const { container } = render(ListView, { vault, onSectionAdd });
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="list-add-section"]')!,
+      );
+      const input = container.querySelector<HTMLInputElement>(
+        '[data-testid="list-add-section-input"]',
+      );
+      await fireEvent.input(input!, { target: { value: 'Doing' } });
+      await fireEvent.keyDown(input!, { key: 'Enter' });
+      expect(onSectionAdd).toHaveBeenCalledWith('Doing');
+    });
+  });
 });

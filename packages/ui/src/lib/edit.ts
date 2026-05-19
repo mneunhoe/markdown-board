@@ -59,3 +59,15 @@ export interface ArchivedTaskRef {
  * active section, and writes both files.
  */
 export type TaskUnresolveHandler = (target: EditTarget) => void;
+
+// Slice 6i — add task + add section affordances.
+//
+// Per-column add: each Board column gets a `+ Add task` row that
+// reveals an inline text input on click. The handler is fired with
+// the trimmed title (which may be empty — caller chooses whether to
+// no-op).
+export type TaskAddHandler = (sectionId: string, title: string) => void;
+
+// Add a new section (column) to the vault. Trimmed name in; the host
+// shell decides what id to mint and whether to reject collisions.
+export type SectionAddHandler = (name: string) => void;

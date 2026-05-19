@@ -25,6 +25,13 @@
      * `↺` button; the host shell moves the task back to active.
      */
     onUnresolveArchived?: (taskId: string) => void;
+    /**
+     * Slice 6i — when provided, the column renders a `+ Add task` row
+     * at the bottom of `.cards`. Click → inline `<input>`; Enter or
+     * blur commits with the trimmed title; Escape cancels. Mirrors
+     * `dashboard.html:3303-3338`.
+     */
+    onAddTask?: (title: string) => void;
   }
 
   const {
@@ -34,8 +41,10 @@
     onRename,
     archivedTasks = [],
     onUnresolveArchived,
+    onAddTask,
   }: Props = $props();
   const renameable = $derived(onRename !== undefined);
+  const addable = $derived(onAddTask !== undefined);
 
   let editing = $state(false);
   let editValue = $state('');
@@ -69,6 +78,37 @@
       editing = false;
     }
   }
+
+  // Slice 6i add-task affordance state.
+  let addingTask = $state(false);
+  let addValue = $state('');
+  let addCancelled = $state(false);
+  let addInputEl: HTMLInputElement | undefined = $state();
+
+  function startAddTask(): void {
+    addingTask = true;
+    addValue = '';
+    addCancelled = false;
+    queueMicrotask(() => addInputEl?.focus());
+  }
+
+  function commitAddTask(): void {
+    if (!addingTask || addCancelled) return;
+    addingTask = false;
+    const next = addValue.trim();
+    if (next) onAddTask?.(next);
+  }
+
+  function onAddTaskKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitAddTask();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      addCancelled = true;
+      addingTask = false;
+    }
+  }
 </script>
 
 <section class="column" aria-label="Section {name}">
@@ -97,6 +137,27 @@
   </header>
   <div class="cards">
     {@render children?.()}
+    {#if addable}
+      {#if addingTask}
+        <input
+          type="text"
+          class="add-task-input"
+          placeholder="What needs to be done?"
+          data-testid="column-add-task-input"
+          bind:this={addInputEl}
+          bind:value={addValue}
+          onkeydown={onAddTaskKeydown}
+          onblur={commitAddTask}
+        />
+      {:else}
+        <button
+          type="button"
+          class="add-task-btn"
+          data-testid="column-add-task"
+          onclick={startAddTask}>+ Add task</button
+        >
+      {/if}
+    {/if}
     <ArchivedTasksExpander
       tasks={archivedTasks}
       {...onUnresolveArchived ? { onUnresolve: onUnresolveArchived } : {}}
@@ -181,5 +242,40 @@
     overflow-y: auto;
     padding: 0 12px 12px;
     min-height: 100px;
+  }
+
+  .add-task-btn {
+    appearance: none;
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 13px;
+    font-style: italic;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    margin-top: 6px;
+    width: 100%;
+  }
+
+  .add-task-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+  }
+
+  .add-task-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--bg-card);
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 13px;
+    outline: none;
+    margin-top: 6px;
   }
 </style>

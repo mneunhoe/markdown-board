@@ -2,7 +2,9 @@ import type { Task, Vault } from '@markdown-board/core';
 import { describe, expect, it } from 'vitest';
 
 import {
+  addSection,
   addSubtask,
+  addTaskToSection,
   allProjects,
   cycleTaskPriority,
   deleteTask,
@@ -483,5 +485,79 @@ describe('setTask (slice 6e)', () => {
         },
       ),
     ).toBe(false);
+  });
+});
+
+describe('addTaskToSection (slice 6i)', () => {
+  it('appends a new task to the bottom of the section and mints an id', () => {
+    const v = vault();
+    const id = addTaskToSection(v, 'active', 'New task');
+    expect(id).toBeTruthy();
+    const tasks = v.sections[0]!.tasks;
+    expect(tasks).toHaveLength(3);
+    expect(tasks[tasks.length - 1]!.title).toBe('New task');
+    expect(tasks[tasks.length - 1]!.id).toBe(id);
+    expect(/^[0-9a-f]{8}$/.test(id!)).toBe(true);
+  });
+
+  it('trims the title and returns null when it ends up empty', () => {
+    const v = vault();
+    expect(addTaskToSection(v, 'active', '   ')).toBeNull();
+    expect(v.sections[0]!.tasks).toHaveLength(2);
+  });
+
+  it('returns null when the section is unknown', () => {
+    const v = vault();
+    expect(addTaskToSection(v, 'ghost', 'X')).toBeNull();
+  });
+
+  it('initialises tokens / note / resolution to default empties', () => {
+    const v = vault();
+    addTaskToSection(v, 'active', 'Fresh');
+    const t = v.sections[0]!.tasks[2]!;
+    expect(t.note).toBe('');
+    expect(t.resolution).toBe('');
+    expect(t.priority).toBeNull();
+    expect(t.project).toBeNull();
+    expect(t.day).toBeNull();
+    expect(t.pomodoros).toBe(0);
+    expect(t.subtasks).toEqual([]);
+    expect(t.checked).toBe(false);
+  });
+});
+
+describe('addSection (slice 6i)', () => {
+  it('appends a new section with a slugged id', () => {
+    const v = vault();
+    const result = addSection(v, 'On Deck');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.id).toBe('on-deck');
+    expect(v.sections).toHaveLength(3);
+    expect(v.sections[2]!.name).toBe('On Deck');
+    expect(v.sections[2]!.tasks).toEqual([]);
+  });
+
+  it('returns reason=empty for whitespace-only names', () => {
+    const v = vault();
+    const result = addSection(v, '  ');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('empty');
+    expect(v.sections).toHaveLength(2);
+  });
+
+  it('returns reason=collision when the slug matches an existing section', () => {
+    const v = vault();
+    const result = addSection(v, 'Active');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('collision');
+    expect(v.sections).toHaveLength(2);
+  });
+
+  it('treats case-insensitive slug collisions as collisions', () => {
+    const v = vault();
+    const result = addSection(v, 'ACTIVE');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('collision');
   });
 });

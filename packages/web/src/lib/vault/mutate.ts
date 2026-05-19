@@ -7,7 +7,7 @@
 // short-circuit silently if a stale handle / no-op move sneaks through.
 
 import { nextPriority, slugifySection } from '@markdown-board/core';
-import type { Day, Priority, Task, Vault } from '@markdown-board/core';
+import type { Day, Priority, Section, Task, Vault } from '@markdown-board/core';
 
 export interface TaskMove {
   taskId: string;
@@ -233,6 +233,61 @@ export function renameSection(vault: Vault, sectionId: string, nextName: string)
   section.name = trimmed;
   section.id = newId;
   return true;
+}
+
+/**
+ * Append a new task to the bottom of `sectionId`. Mirrors the
+ * prototype's `addNewTask` (`dashboard.html:3303-3338`). Returns the
+ * minted task id on success, `null` when the section doesn't exist.
+ * Title is trimmed; an empty title yields `null`.
+ *
+ * The new task gets a freshly-minted id via `ensureUniqueTaskIds` so
+ * the DnD subsystem can identify it. All token / note fields default
+ * to empty / null — the user can fill them in afterward via inline
+ * edit (slice 6a) or the full editor (slice 6e).
+ */
+export function addTaskToSection(vault: Vault, sectionId: string, title: string): string | null {
+  const trimmed = title.trim();
+  if (!trimmed) return null;
+  const section = vault.sections.find((s) => s.id === sectionId);
+  if (!section) return null;
+  const newTask: Task = {
+    id: '',
+    checked: false,
+    title: trimmed,
+    note: '',
+    resolution: '',
+    priority: null,
+    project: null,
+    day: null,
+    pomodoros: 0,
+    subtasks: [],
+  };
+  section.tasks.push(newTask);
+  ensureUniqueTaskIds(vault);
+  return newTask.id;
+}
+
+export type AddSectionResult =
+  | { ok: true; id: string }
+  | { ok: false; reason: 'empty' | 'collision' };
+
+/**
+ * Append a new section to the end of the vault. Mirrors
+ * `startAddingSection` (`dashboard.html:4560-4592`). Name is trimmed;
+ * empty → reason='empty'. Slug collides with an existing section's id
+ * → reason='collision' (App.svelte surfaces both via `role=alert`).
+ */
+export function addSection(vault: Vault, name: string): AddSectionResult {
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, reason: 'empty' };
+  const id = slugifySection(trimmed);
+  if (vault.sections.some((s) => s.id === id)) {
+    return { ok: false, reason: 'collision' };
+  }
+  const section: Section = { id, name: trimmed, tasks: [] };
+  vault.sections.push(section);
+  return { ok: true, id };
 }
 
 /**

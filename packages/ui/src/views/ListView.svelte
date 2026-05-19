@@ -12,6 +12,7 @@
     NoteEditHandler,
     PriorityCycleHandler,
     ProjectEditOpenHandler,
+    SectionAddHandler,
     SectionRenameHandler,
     SubtaskAddHandler,
     SubtaskEditHandler,
@@ -54,6 +55,8 @@
     archivedTasksBySection?: Record<string, ArchivedTaskRef[]>;
     /** Slice 6g — fires when `↺` is clicked on an archived card. */
     onTaskUnresolve?: TaskUnresolveHandler;
+    /** Slice 6i — `+ Add Section` row at the bottom of the list view. */
+    onSectionAdd?: SectionAddHandler;
   }
 
   const {
@@ -75,11 +78,44 @@
     onFullTaskEdit,
     archivedTasksBySection = {},
     onTaskUnresolve,
+    onSectionAdd,
   }: Props = $props();
 
   const hasSections = $derived(vault.sections.length > 0);
   const taskDndEnabled = $derived(onTaskMove !== undefined);
   const renameable = $derived(onSectionRename !== undefined);
+  const sectionAddable = $derived(onSectionAdd !== undefined);
+
+  // Slice 6i — "+ Add Section" inline editor.
+  let addingSection = $state(false);
+  let addSectionValue = $state('');
+  let addSectionCancelled = $state(false);
+  let addSectionInputEl: HTMLInputElement | undefined = $state();
+
+  function startAddSection(): void {
+    addingSection = true;
+    addSectionValue = '';
+    addSectionCancelled = false;
+    queueMicrotask(() => addSectionInputEl?.focus());
+  }
+
+  function commitAddSection(): void {
+    if (!addingSection || addSectionCancelled) return;
+    addingSection = false;
+    const next = addSectionValue.trim();
+    if (next) onSectionAdd?.(next);
+  }
+
+  function onAddSectionKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitAddSection();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      addSectionCancelled = true;
+      addingSection = false;
+    }
+  }
 
   // Per-section rename state. Keyed by sectionId so each section can be
   // independently put into edit mode; only one at a time in practice.
@@ -255,6 +291,49 @@
         </div>
       </section>
     {/each}
+    {#if sectionAddable}
+      {#if addingSection}
+        <input
+          type="text"
+          class="list-add-section-input"
+          placeholder="Section name…"
+          data-testid="list-add-section-input"
+          bind:this={addSectionInputEl}
+          bind:value={addSectionValue}
+          onkeydown={onAddSectionKeydown}
+          onblur={commitAddSection}
+        />
+      {:else}
+        <button
+          type="button"
+          class="list-add-section-btn"
+          data-testid="list-add-section"
+          onclick={startAddSection}>+ Add Section</button
+        >
+      {/if}
+    {/if}
+  </div>
+{:else if sectionAddable}
+  <div class="list-view">
+    {#if addingSection}
+      <input
+        type="text"
+        class="list-add-section-input"
+        placeholder="Section name…"
+        data-testid="list-add-section-input"
+        bind:this={addSectionInputEl}
+        bind:value={addSectionValue}
+        onkeydown={onAddSectionKeydown}
+        onblur={commitAddSection}
+      />
+    {:else}
+      <button
+        type="button"
+        class="list-add-section-btn"
+        data-testid="list-add-section"
+        onclick={startAddSection}>+ Add Section</button
+      >
+    {/if}
   </div>
 {:else}
   <EmptyState title={emptyTitle} hint={emptyHint} />
@@ -367,5 +446,37 @@
   }
   :global(.list-task-slot[data-drop-edge='bottom']::before) {
     bottom: 5px;
+  }
+
+  .list-add-section-btn {
+    appearance: none;
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 13px;
+    font-style: italic;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    align-self: flex-start;
+  }
+
+  .list-add-section-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+  }
+
+  .list-add-section-input {
+    background: var(--bg-card);
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 13px;
+    outline: none;
+    align-self: flex-start;
+    min-width: 240px;
   }
 </style>

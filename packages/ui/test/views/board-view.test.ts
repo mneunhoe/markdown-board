@@ -121,4 +121,39 @@ describe('BoardView', () => {
       expect(checkbox?.classList.contains('interactive')).toBe(false);
     });
   });
+
+  describe('onSectionAdd (slice 6i)', () => {
+    it('without onSectionAdd, no placeholder column is rendered', () => {
+      const vault = makeVault([makeSection('active', 'Active')]);
+      const { container } = render(BoardView, { vault });
+      expect(container.querySelector('[data-testid="board-add-section"]')).toBeNull();
+    });
+
+    it('with onSectionAdd, a "+ Add Section" placeholder appears at the end of the board', () => {
+      const vault = makeVault([makeSection('active', 'Active')]);
+      const { container } = render(BoardView, { vault, onSectionAdd: () => {} });
+      expect(container.querySelector('[data-testid="board-add-section"]')).toBeTruthy();
+    });
+
+    it('with onSectionAdd and an empty vault, the placeholder is the only column (no EmptyState)', () => {
+      const { container } = render(BoardView, { vault: makeVault([]), onSectionAdd: () => {} });
+      expect(container.querySelector('.empty-state')).toBeNull();
+      expect(container.querySelector('[data-testid="board-add-section"]')).toBeTruthy();
+    });
+
+    it('clicking the placeholder swaps in an input; Enter commits the trimmed name', async () => {
+      const onSectionAdd = vi.fn();
+      const vault = makeVault([makeSection('active', 'Active')]);
+      const { container } = render(BoardView, { vault, onSectionAdd });
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="board-add-section"]')!,
+      );
+      const input = container.querySelector<HTMLInputElement>(
+        '[data-testid="board-add-section-input"]',
+      );
+      await fireEvent.input(input!, { target: { value: '  On Deck  ' } });
+      await fireEvent.keyDown(input!, { key: 'Enter' });
+      expect(onSectionAdd).toHaveBeenCalledWith('On Deck');
+    });
+  });
 });

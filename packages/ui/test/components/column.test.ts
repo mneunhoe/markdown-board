@@ -158,4 +158,61 @@ describe('Column', () => {
       expect(onUnresolveArchived).toHaveBeenCalledWith('abc');
     });
   });
+
+  describe('onAddTask (slice 6i)', () => {
+    it('without onAddTask, no "+ Add task" affordance is rendered', () => {
+      const { container } = render(Column, { name: 'Active', count: 0 });
+      expect(container.querySelector('[data-testid="column-add-task"]')).toBeNull();
+    });
+
+    it('with onAddTask, clicking the affordance swaps in an input', async () => {
+      const { container } = render(Column, { name: 'Active', count: 0, onAddTask: () => {} });
+      const btn = container.querySelector<HTMLButtonElement>('[data-testid="column-add-task"]');
+      expect(btn).toBeTruthy();
+      await fireEvent.click(btn!);
+      expect(container.querySelector('[data-testid="column-add-task-input"]')).toBeTruthy();
+    });
+
+    it('committing with Enter calls onAddTask with the trimmed title', async () => {
+      const onAddTask = vi.fn();
+      const { container } = render(Column, { name: 'Active', count: 0, onAddTask });
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="column-add-task"]')!,
+      );
+      const input = container.querySelector<HTMLInputElement>(
+        '[data-testid="column-add-task-input"]',
+      );
+      await fireEvent.input(input!, { target: { value: '  Fresh task  ' } });
+      await fireEvent.keyDown(input!, { key: 'Enter' });
+      expect(onAddTask).toHaveBeenCalledWith('Fresh task');
+    });
+
+    it('Escape reverts and does not call onAddTask', async () => {
+      const onAddTask = vi.fn();
+      const { container } = render(Column, { name: 'Active', count: 0, onAddTask });
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="column-add-task"]')!,
+      );
+      const input = container.querySelector<HTMLInputElement>(
+        '[data-testid="column-add-task-input"]',
+      );
+      await fireEvent.input(input!, { target: { value: 'discarded' } });
+      await fireEvent.keyDown(input!, { key: 'Escape' });
+      expect(onAddTask).not.toHaveBeenCalled();
+    });
+
+    it('empty / whitespace-only Enter does not call onAddTask', async () => {
+      const onAddTask = vi.fn();
+      const { container } = render(Column, { name: 'Active', count: 0, onAddTask });
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="column-add-task"]')!,
+      );
+      const input = container.querySelector<HTMLInputElement>(
+        '[data-testid="column-add-task-input"]',
+      );
+      await fireEvent.input(input!, { target: { value: '   ' } });
+      await fireEvent.keyDown(input!, { key: 'Enter' });
+      expect(onAddTask).not.toHaveBeenCalled();
+    });
+  });
 });

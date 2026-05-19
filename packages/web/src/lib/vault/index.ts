@@ -9,7 +9,9 @@ export {
 export { Autosaver, type AutosaverOptions } from './autosave.js';
 export { ExternalChangeWatcher, type ExternalChangeWatcherOptions } from './watcher.js';
 export {
+  addSection,
   addSubtask,
+  addTaskToSection,
   allProjects,
   cycleTaskPriority,
   deleteTask,
@@ -25,6 +27,7 @@ export {
   setTaskProject,
   setTaskTitle,
   toggleSubtask,
+  type AddSectionResult,
   type ColumnMove,
   type TaskMove,
   type TaskTarget,

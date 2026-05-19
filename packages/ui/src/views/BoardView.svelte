@@ -12,10 +12,12 @@
     NoteEditHandler,
     PriorityCycleHandler,
     ProjectEditOpenHandler,
+    SectionAddHandler,
     SectionRenameHandler,
     SubtaskAddHandler,
     SubtaskEditHandler,
     SubtaskToggleHandler,
+    TaskAddHandler,
     TaskDeleteHandler,
     TaskUnresolveHandler,
     TitleEditHandler,
@@ -69,6 +71,17 @@
      * Omitted ⇒ archived cards stay fully read-only.
      */
     onTaskUnresolve?: TaskUnresolveHandler;
+    /**
+     * Slice 6i — `+ Add task` per column. Omitted ⇒ the affordance is
+     * hidden. Fires with the trimmed title; empty inputs are filtered
+     * at the Column level before the handler is called.
+     */
+    onTaskAdd?: TaskAddHandler;
+    /**
+     * Slice 6i — `+ Add Section` placeholder column at the end of the
+     * board. Omitted ⇒ the placeholder is not rendered.
+     */
+    onSectionAdd?: SectionAddHandler;
   }
 
   const {
@@ -91,11 +104,45 @@
     onFullTaskEdit,
     archivedTasksBySection = {},
     onTaskUnresolve,
+    onTaskAdd,
+    onSectionAdd,
   }: Props = $props();
 
   const hasSections = $derived(vault.sections.length > 0);
   const taskDndEnabled = $derived(onTaskMove !== undefined);
   const columnDndEnabled = $derived(onColumnMove !== undefined);
+  const sectionAddable = $derived(onSectionAdd !== undefined);
+
+  // Slice 6i — "+ Add Section" placeholder state.
+  let addingSection = $state(false);
+  let addSectionValue = $state('');
+  let addSectionCancelled = $state(false);
+  let addSectionInputEl: HTMLInputElement | undefined = $state();
+
+  function startAddSection(): void {
+    addingSection = true;
+    addSectionValue = '';
+    addSectionCancelled = false;
+    queueMicrotask(() => addSectionInputEl?.focus());
+  }
+
+  function commitAddSection(): void {
+    if (!addingSection || addSectionCancelled) return;
+    addingSection = false;
+    const next = addSectionValue.trim();
+    if (next) onSectionAdd?.(next);
+  }
+
+  function onAddSectionKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitAddSection();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      addSectionCancelled = true;
+      addingSection = false;
+    }
+  }
 </script>
 
 {#if hasSections}
@@ -131,6 +178,7 @@
                   onTaskUnresolve({ taskId, sectionId: section.id }),
               }
             : {}}
+          {...onTaskAdd ? { onAddTask: (title: string) => onTaskAdd(section.id, title) } : {}}
         >
           {#each section.tasks as task, taskIdx (task.id || `${section.id}:${task.title}`)}
             <div
@@ -218,6 +266,53 @@
         </Column>
       </div>
     {/each}
+    {#if sectionAddable}
+      <div class="board-add-section" role="listitem">
+        {#if addingSection}
+          <input
+            type="text"
+            class="add-section-input"
+            placeholder="Section name…"
+            data-testid="board-add-section-input"
+            bind:this={addSectionInputEl}
+            bind:value={addSectionValue}
+            onkeydown={onAddSectionKeydown}
+            onblur={commitAddSection}
+          />
+        {:else}
+          <button
+            type="button"
+            class="add-section-btn"
+            data-testid="board-add-section"
+            onclick={startAddSection}>+ Add Section</button
+          >
+        {/if}
+      </div>
+    {/if}
+  </div>
+{:else if sectionAddable}
+  <div class="board" role="list" aria-label="Task board">
+    <div class="board-add-section" role="listitem">
+      {#if addingSection}
+        <input
+          type="text"
+          class="add-section-input"
+          placeholder="Section name…"
+          data-testid="board-add-section-input"
+          bind:this={addSectionInputEl}
+          bind:value={addSectionValue}
+          onkeydown={onAddSectionKeydown}
+          onblur={commitAddSection}
+        />
+      {:else}
+        <button
+          type="button"
+          class="add-section-btn"
+          data-testid="board-add-section"
+          onclick={startAddSection}>+ Add Section</button
+        >
+      {/if}
+    </div>
   </div>
 {:else}
   <EmptyState title={emptyTitle} hint={emptyHint} />
@@ -240,6 +335,49 @@
     flex: 1 1 280px;
     max-width: 360px;
     position: relative;
+  }
+
+  .board-add-section {
+    min-width: 280px;
+    flex: 0 0 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+  }
+
+  .add-section-btn {
+    appearance: none;
+    background: transparent;
+    border: 2px dashed var(--border);
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 16px 24px;
+    border-radius: 12px;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    min-height: 120px;
+  }
+
+  .add-section-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+  }
+
+  .add-section-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--bg-card);
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 14px;
+    outline: none;
   }
 
   /* Runtime attribute selectors — pragmatic-dnd sets data-dragging /
