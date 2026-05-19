@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "markdown-board",
+  "version": "0.0.0",
+  "identifier": "dev.markdown-board.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "markdown-board",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 720,
+        "minHeight": 480,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "Kanban-first knowledge workspace on plain Markdown files you own.",
+    "longDescription": "markdown-board is a local-first task board and notes workspace that reads and writes plain Markdown files in a folder you own. The desktop build wraps the @markdown-board/ui front-end with a TauriFileAdapter and a native file watcher.",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.png"]
+  }
+}

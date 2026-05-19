@@ -2,12 +2,27 @@
   "name": "@markdown-board/desktop",
   "version": "0.0.0",
   "private": true,
-  "description": "Tauri 2 desktop shell. Reuses @markdown-board/ui. Real scaffold lands in Phase 2.",
+  "description": "Tauri 2 desktop shell. Reuses @markdown-board/ui (TauriFileAdapter lands in slice 2).",
   "type": "module",
   "scripts": {
-    "build": "echo \"desktop: Tauri scaffold lands in Phase 2\"",
-    "test": "echo \"desktop: Playwright + Tauri smoke tests land in Phase 2\"",
-    "lint": "echo \"desktop: lint config lands in Phase 2\"",
-    "typecheck": "echo \"desktop: typecheck lands in Phase 2\""
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "test": "echo \"desktop: smoke tests land in a later Phase 2 slice\"",
+    "lint": "eslint .",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.1.1"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "@tauri-apps/cli": "^2.1.0",
+    "@types/node": "^22.9.0",
+    "svelte": "^5.2.0",
+    "svelte-check": "^4.0.9",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
   }
 }
