@@ -25,11 +25,45 @@ function removePicker(): void {
 describe('App (web shell)', () => {
   afterEach(() => {
     removePicker();
+    localStorage.removeItem('markdown-board:settings');
+    document.documentElement.removeAttribute('data-theme');
   });
 
   it('always renders the brand title', () => {
     const { container } = render(App);
     expect(container.querySelector('.brand')?.textContent?.trim()).toBe('markdown-board');
+  });
+
+  it('always renders the Settings button (even before a vault is open)', () => {
+    const { container } = render(App);
+    expect(container.querySelector('[data-testid="open-settings"]')).toBeTruthy();
+  });
+
+  it('clicking Settings opens the SettingsModal', async () => {
+    const { container } = render(App);
+    expect(container.querySelector('[data-testid="theme-system"]')).toBeNull();
+    const settingsBtn = container.querySelector<HTMLButtonElement>('[data-testid="open-settings"]');
+    await fireEvent.click(settingsBtn!);
+    expect(container.querySelector('[data-testid="theme-system"]')).toBeTruthy();
+  });
+
+  it('switching theme to dark sets data-theme on the document', async () => {
+    const { container } = render(App);
+    const settingsBtn = container.querySelector<HTMLButtonElement>('[data-testid="open-settings"]');
+    await fireEvent.click(settingsBtn!);
+    const darkRadio = container.querySelector<HTMLInputElement>('[data-testid="theme-dark"]');
+    await fireEvent.click(darkRadio!);
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+  });
+
+  it('persists the chosen theme to localStorage', async () => {
+    const { container } = render(App);
+    const settingsBtn = container.querySelector<HTMLButtonElement>('[data-testid="open-settings"]');
+    await fireEvent.click(settingsBtn!);
+    const lightRadio = container.querySelector<HTMLInputElement>('[data-testid="theme-light"]');
+    await fireEvent.click(lightRadio!);
+    const stored = localStorage.getItem('markdown-board:settings');
+    expect(stored).toContain('"theme":"light"');
   });
 
   describe('without File System Access API support', () => {

@@ -9,7 +9,9 @@
   } from '@markdown-board/ui';
   import { FSAFileAdapter } from './lib/adapters/index.js';
   import ResolveModal from './components/ResolveModal.svelte';
+  import SettingsModal from './components/SettingsModal.svelte';
   import VaultWorkspace from './components/VaultWorkspace.svelte';
+  import { applyTheme, loadSettings, saveSettings, type Settings } from './lib/settings.js';
   import {
     Autosaver,
     ExternalChangeWatcher,
@@ -35,6 +37,8 @@
   /** Captured at modal-open time so a concurrent external reload can't shift the target. */
   let resolveTarget = $state<{ task: Task; section: Section } | null>(null);
   let resolving = $state(false);
+  let settings = $state<Settings>(loadSettings());
+  let settingsOpen = $state(false);
 
   let adapter: FSAFileAdapter | null = null;
   let autosaver: Autosaver | null = null;
@@ -154,6 +158,12 @@
     resolveTarget = null;
   }
 
+  function handleSettingsChange(next: Settings): void {
+    settings = next;
+    saveSettings(next);
+    applyTheme(next.theme);
+  }
+
   // Autosave $effect — re-runs on any deep mutation of `loaded.vault`
   // (Svelte 5's proxy traverses sections/tasks). Schedules a write when
   // the canonical markdown drifts from what we last wrote.
@@ -172,17 +182,28 @@
 <main class="shell">
   <header class="topbar">
     <h1 class="brand">markdown-board</h1>
-    {#if loaded}
+    <div class="topbar-actions">
+      {#if loaded}
+        <button
+          type="button"
+          class="topbar-action"
+          onclick={pickAndLoad}
+          disabled={loading}
+          data-testid="reopen-vault"
+        >
+          {loading ? 'Loading…' : 'Open another vault…'}
+        </button>
+      {/if}
       <button
         type="button"
         class="topbar-action"
-        onclick={pickAndLoad}
-        disabled={loading}
-        data-testid="reopen-vault"
+        aria-label="Open settings"
+        data-testid="open-settings"
+        onclick={() => (settingsOpen = true)}
       >
-        {loading ? 'Loading…' : 'Open another vault…'}
+        Settings
       </button>
-    {/if}
+    </div>
   </header>
 
   <section class="body" class:empty={!loaded}>
@@ -226,6 +247,13 @@
     onConfirm={confirmResolve}
     onCancel={cancelResolve}
   />
+
+  <SettingsModal
+    open={settingsOpen}
+    {settings}
+    onChange={handleSettingsChange}
+    onClose={() => (settingsOpen = false)}
+  />
 </main>
 
 <style>
@@ -250,6 +278,11 @@
     font-weight: 600;
     color: var(--text-primary);
     letter-spacing: -0.01em;
+  }
+
+  .topbar-actions {
+    display: flex;
+    gap: 8px;
   }
 
   .topbar-action {
