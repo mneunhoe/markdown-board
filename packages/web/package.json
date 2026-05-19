@@ -2,12 +2,30 @@
   "name": "@markdown-board/web",
   "version": "0.0.0",
   "private": true,
-  "description": "Static SvelteKit web demo. Opens a local vault via the File System Access API. Real scaffold lands in Phase 1.",
+  "description": "Vite + Svelte 5 web demo. Opens a local vault via the File System Access API.",
   "type": "module",
   "scripts": {
-    "build": "echo \"web: SvelteKit scaffold lands in Phase 1\"",
-    "test": "echo \"web: Playwright suite lands in Phase 1\"",
-    "lint": "echo \"web: lint config lands in Phase 1\"",
-    "typecheck": "echo \"web: typecheck lands in Phase 1\""
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "@markdown-board/core": "workspace:*",
+    "@markdown-board/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "@testing-library/svelte": "^5.2.4",
+    "@types/node": "^22.9.0",
+    "happy-dom": "^15.11.6",
+    "svelte": "^5.2.0",
+    "svelte-check": "^4.0.9",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.4"
   }
 }
