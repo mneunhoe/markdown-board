@@ -1,7 +1,7 @@
 import { InMemoryAdapter, type FileAdapter } from '@markdown-board/core';
 import { describe, expect, it } from 'vitest';
 
-import { loadVault } from '../../../src/lib/vault/load.js';
+import { loadArchive, loadVault } from '../../../src/lib/vault/load.js';
 
 describe('loadVault', () => {
   it('returns an empty vault when TASKS.md is missing', async () => {
@@ -93,5 +93,56 @@ describe('loadVault', () => {
     });
     const { libraryDocs } = await loadVault(adapter);
     expect(libraryDocs[0]?.rawContent).toBe('# Notes\n\nBody copy.\n');
+  });
+
+  it('returns archive: null when archive/TASKS.md is missing', async () => {
+    const adapter = new InMemoryAdapter({ 'TASKS.md': '## Active\n' });
+    const { archive } = await loadVault(adapter);
+    expect(archive).toBeNull();
+  });
+
+  it('returns archive as a parsed Vault when archive/TASKS.md is present', async () => {
+    const adapter = new InMemoryAdapter({
+      'TASKS.md': '## Active\n',
+      'archive/TASKS.md':
+        '# Archived Tasks\n\nResolved tasks moved out of `TASKS.md` by the dashboard.\n\n' +
+        '## 2026-05-18 10:43 — Active\n\n' +
+        '- [x] **Ship** - done <!-- id:abc12345 -->\n',
+    });
+    const { archive } = await loadVault(adapter);
+    expect(archive).not.toBeNull();
+    expect(archive?.sections).toHaveLength(1);
+    expect(archive?.sections[0]?.name).toBe('2026-05-18 10:43 — Active');
+    expect(archive?.sections[0]?.tasks[0]?.title).toBe('Ship');
+    expect(archive?.sections[0]?.tasks[0]?.checked).toBe(true);
+  });
+});
+
+describe('loadArchive', () => {
+  it('returns null when archive/TASKS.md is missing', async () => {
+    const adapter = new InMemoryAdapter({ 'TASKS.md': '' });
+    expect(await loadArchive(adapter)).toBeNull();
+  });
+
+  it('returns a parsed Vault when archive/TASKS.md exists', async () => {
+    const adapter = new InMemoryAdapter({
+      'archive/TASKS.md':
+        '# Archived Tasks\n\n' +
+        '## 2026-05-19 09:00 — Doing\n\n' +
+        '- [x] **B** <!-- id:bbb -->\n',
+    });
+    const archive = await loadArchive(adapter);
+    expect(archive?.sections.map((s) => s.name)).toEqual(['2026-05-19 09:00 — Doing']);
+    expect(archive?.sections[0]?.tasks[0]?.id).toBe('bbb');
+  });
+
+  it('returns an empty Vault (not null) when the archive exists but has only a prelude', () => {
+    const adapter = new InMemoryAdapter({
+      'archive/TASKS.md': '# Archived Tasks\n\nResolved tasks moved out…\n',
+    });
+    return loadArchive(adapter).then((archive) => {
+      expect(archive).not.toBeNull();
+      expect(archive?.sections).toEqual([]);
+    });
   });
 });

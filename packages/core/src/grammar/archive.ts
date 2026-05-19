@@ -25,7 +25,7 @@
 // (old entries are silently skipped) but writers only ever emit the
 // new shape from this commit forward.
 
-import { emitTaskBlock } from './tasks.js';
+import { emitTaskBlock, parseTaskBlock } from './tasks.js';
 import type { Section, Task } from './types.js';
 
 export const ARCHIVE_HEADER =
@@ -110,4 +110,96 @@ export function appendToArchive(existing: string, entry: string): string {
   }
   const sep = existing.endsWith('\n') ? '' : '\n';
   return `${existing}${sep}${entry}\n`;
+}
+
+export interface RemovedArchivedTask {
+  /** The parsed task itself (with subtasks). `checked` is true as written. */
+  task: Task;
+  /** The original section name from the H2's ` — Section` suffix (empty when the H2 had no suffix). */
+  sourceSection: string;
+  /** Raw `YYYY-MM-DD HH:MM` timestamp from the H2. */
+  archivedAt: string;
+}
+
+export interface RemoveArchivedTaskResult {
+  /** New archive content with the matching block sliced out. */
+  content: string;
+  /** Removed task metadata, or `null` when no entry with the supplied id was found. */
+  removed: RemovedArchivedTask | null;
+}
+
+const ARCHIVE_H2_RE = /^## (?<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?: — (?<section>.+?))?\s*$/;
+
+/**
+ * Slice out the archive entry whose body contains the matching
+ * `<!-- id:taskId -->` comment. Pure string-in / string-out — caller
+ * handles I/O and any cross-file mutations.
+ *
+ * The "entry block" runs from a `## YYYY-MM-DD HH:MM — Section` H2
+ * line through to (but not including) the next H2 or end-of-file.
+ * Trailing blank lines that belong to the removed block are pulled
+ * out with it, so the surrounding boundary stays tight.
+ *
+ * Used by slice 6g-3's `unresolveTask` flow plus any future "empty
+ * archive" / "delete archive entry" command (Phase 3).
+ *
+ * Returns `removed: null` and unchanged `content` when:
+ * - `taskId` is empty
+ * - no archive H2 contains a body line with `<!-- id:taskId -->`
+ * - the matching block's body fails to parse via `parseTaskBlock`
+ *   (malformed entry — likely an old-format archive line that
+ *   slipped through; safer to leave it in place than corrupt it)
+ */
+export function removeArchivedTask(content: string, taskId: string): RemoveArchivedTaskResult {
+  if (!taskId) return { content, removed: null };
+
+  const normalized = content.replace(/\r\n?/g, '\n');
+  const lines = normalized.split('\n');
+  const idPattern = `<!-- id:${taskId} -->`;
+
+  const h2Indices: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (ARCHIVE_H2_RE.test(lines[i]!)) h2Indices.push(i);
+  }
+
+  for (let b = 0; b < h2Indices.length; b++) {
+    const blockStart = h2Indices[b]!;
+    const blockEnd = b + 1 < h2Indices.length ? h2Indices[b + 1]! : lines.length;
+
+    let bodyHasId = false;
+    for (let i = blockStart + 1; i < blockEnd; i++) {
+      if (lines[i]!.includes(idPattern)) {
+        bodyHasId = true;
+        break;
+      }
+    }
+    if (!bodyHasId) continue;
+
+    const h2Match = ARCHIVE_H2_RE.exec(lines[blockStart]!)!;
+    const archivedAt = h2Match.groups?.['ts'] ?? '';
+    const sourceSection = (h2Match.groups?.['section'] ?? '').trim();
+
+    const bodyText = lines
+      .slice(blockStart + 1, blockEnd)
+      .join('\n')
+      .replace(/^\s+|\s+$/g, '');
+    const task = parseTaskBlock(bodyText);
+    if (!task) continue;
+
+    const remainingLines = [...lines.slice(0, blockStart), ...lines.slice(blockEnd)];
+    let nextContent = remainingLines.join('\n');
+    // Collapse a run of 3+ blank lines (introduced when both the previous
+    // and the removed block had trailing blanks) down to 2.
+    nextContent = nextContent.replace(/\n{3,}/g, '\n\n');
+    // Ensure the file still ends with a single trailing newline when it
+    // had content to begin with (matches `appendToArchive`).
+    if (nextContent.length > 0 && !nextContent.endsWith('\n')) nextContent += '\n';
+
+    return {
+      content: nextContent,
+      removed: { task, sourceSection, archivedAt },
+    };
+  }
+
+  return { content, removed: null };
 }

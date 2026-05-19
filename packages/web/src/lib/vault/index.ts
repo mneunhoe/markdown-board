@@ -1,4 +1,4 @@
-export { loadVault, type LoadedVault } from './load.js';
+export { loadVault, loadArchive, type LoadedVault } from './load.js';
 export { saveLibraryFile } from './library.js';
 export {
   FileSystemAccessUnsupportedError,

@@ -2,7 +2,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ARCHIVE_HEADER, appendToArchive, buildArchiveEntry } from '../../src/grammar/archive.js';
+import {
+  ARCHIVE_HEADER,
+  appendToArchive,
+  buildArchiveEntry,
+  removeArchivedTask,
+} from '../../src/grammar/archive.js';
 import { parseTasks } from '../../src/grammar/tasks.js';
 import type { Section, Task } from '../../src/grammar/types.js';
 
@@ -341,5 +346,163 @@ describe('appendToArchive — golden file (new task-grammar format)', () => {
 
     const out = appendToArchive('', entry);
     expect(out).toBe(fixture);
+  });
+});
+
+describe('removeArchivedTask (slice 6g-1)', () => {
+  function makeArchive(...entries: Array<{ ts: string; section: string; line: string }>): string {
+    const blocks = entries.map((e) => `## ${e.ts} — ${e.section}\n\n${e.line}\n`).join('\n');
+    return `${ARCHIVE_HEADER}\n${blocks}`;
+  }
+
+  it('returns null and unchanged content for an empty taskId', () => {
+    const archive = makeArchive({
+      ts: '2026-05-18 10:00',
+      section: 'Active',
+      line: '- [x] **A** <!-- id:aaa -->',
+    });
+    const out = removeArchivedTask(archive, '');
+    expect(out.removed).toBeNull();
+    expect(out.content).toBe(archive);
+  });
+
+  it('returns null when no entry contains the matching id', () => {
+    const archive = makeArchive({
+      ts: '2026-05-18 10:00',
+      section: 'Active',
+      line: '- [x] **A** <!-- id:aaa -->',
+    });
+    const out = removeArchivedTask(archive, 'unknown');
+    expect(out.removed).toBeNull();
+    expect(out.content).toBe(archive);
+  });
+
+  it('removes a single matching entry and returns the parsed task', () => {
+    const archive = makeArchive({
+      ts: '2026-05-18 10:00',
+      section: 'Active',
+      line: '- [x] **[P0] Ship** - shipped <!-- id:abc12345 -->',
+    });
+    const out = removeArchivedTask(archive, 'abc12345');
+    expect(out.removed).not.toBeNull();
+    expect(out.removed?.task.id).toBe('abc12345');
+    expect(out.removed?.task.title).toBe('Ship');
+    expect(out.removed?.task.priority).toBe('blocker');
+    expect(out.removed?.task.checked).toBe(true);
+    expect(out.removed?.task.note).toBe('shipped');
+    expect(out.removed?.sourceSection).toBe('Active');
+    expect(out.removed?.archivedAt).toBe('2026-05-18 10:00');
+    // The H2 + task line are gone.
+    expect(out.content).not.toContain('## 2026-05-18 10:00');
+    expect(out.content).not.toContain('<!-- id:abc12345 -->');
+  });
+
+  it('preserves the prelude (# Archived Tasks header + intro)', () => {
+    const archive = makeArchive({
+      ts: '2026-05-18 10:00',
+      section: 'Active',
+      line: '- [x] **A** <!-- id:aaa -->',
+    });
+    const out = removeArchivedTask(archive, 'aaa');
+    expect(out.content.startsWith(ARCHIVE_HEADER)).toBe(true);
+  });
+
+  it('removes the first entry of multiple, leaving the rest intact', () => {
+    const archive = makeArchive(
+      { ts: '2026-05-18 10:00', section: 'Active', line: '- [x] **A** <!-- id:aaa -->' },
+      { ts: '2026-05-19 09:00', section: 'Doing', line: '- [x] **B** <!-- id:bbb -->' },
+      { ts: '2026-05-20 11:00', section: 'Active', line: '- [x] **C** <!-- id:ccc -->' },
+    );
+    const out = removeArchivedTask(archive, 'aaa');
+    expect(out.removed?.task.title).toBe('A');
+    expect(out.content).not.toContain('<!-- id:aaa -->');
+    expect(out.content).toContain('<!-- id:bbb -->');
+    expect(out.content).toContain('<!-- id:ccc -->');
+    expect(out.content).toContain('## 2026-05-19 09:00 — Doing');
+    expect(out.content).toContain('## 2026-05-20 11:00 — Active');
+  });
+
+  it('removes a middle entry and keeps the surrounding ones in place', () => {
+    const archive = makeArchive(
+      { ts: '2026-05-18 10:00', section: 'Active', line: '- [x] **A** <!-- id:aaa -->' },
+      { ts: '2026-05-19 09:00', section: 'Doing', line: '- [x] **B** <!-- id:bbb -->' },
+      { ts: '2026-05-20 11:00', section: 'Active', line: '- [x] **C** <!-- id:ccc -->' },
+    );
+    const out = removeArchivedTask(archive, 'bbb');
+    expect(out.removed?.task.title).toBe('B');
+    expect(out.removed?.sourceSection).toBe('Doing');
+    expect(out.content).toContain('<!-- id:aaa -->');
+    expect(out.content).not.toContain('<!-- id:bbb -->');
+    expect(out.content).toContain('<!-- id:ccc -->');
+    // No 3+ consecutive blank lines after the splice.
+    expect(out.content).not.toMatch(/\n\n\n/);
+  });
+
+  it('removes the last entry without leaving trailing blank lines', () => {
+    const archive = makeArchive(
+      { ts: '2026-05-18 10:00', section: 'Active', line: '- [x] **A** <!-- id:aaa -->' },
+      { ts: '2026-05-19 09:00', section: 'Doing', line: '- [x] **B** <!-- id:bbb -->' },
+    );
+    const out = removeArchivedTask(archive, 'bbb');
+    expect(out.content).toContain('<!-- id:aaa -->');
+    expect(out.content).not.toContain('<!-- id:bbb -->');
+    expect(out.content.endsWith('\n')).toBe(true);
+    expect(out.content).not.toMatch(/\n\n\n/);
+  });
+
+  it('extracts the source section name from the H2 suffix', () => {
+    const archive = makeArchive({
+      ts: '2026-05-18 10:00',
+      section: 'On Deck',
+      line: '- [x] **A** <!-- id:aaa -->',
+    });
+    const out = removeArchivedTask(archive, 'aaa');
+    expect(out.removed?.sourceSection).toBe('On Deck');
+  });
+
+  it('returns sourceSection="" when the H2 has no ` — Section` suffix', () => {
+    const archive = `${ARCHIVE_HEADER}\n## 2026-05-18 10:00\n\n- [x] **A** <!-- id:aaa -->\n`;
+    const out = removeArchivedTask(archive, 'aaa');
+    expect(out.removed?.sourceSection).toBe('');
+    expect(out.removed?.archivedAt).toBe('2026-05-18 10:00');
+  });
+
+  it('preserves the removed task subtasks', () => {
+    const archive =
+      `${ARCHIVE_HEADER}\n## 2026-05-18 10:00 — Active\n\n` +
+      `- [x] **A** <!-- id:aaa -->\n` +
+      `  - [x] one\n` +
+      `  - [ ] two\n`;
+    const out = removeArchivedTask(archive, 'aaa');
+    expect(out.removed?.task.subtasks).toEqual([
+      { text: 'one', checked: true },
+      { text: 'two', checked: false },
+    ]);
+  });
+
+  it('normalises CRLF input on the way in', () => {
+    const archive =
+      `${ARCHIVE_HEADER}\r\n## 2026-05-18 10:00 — Active\r\n\r\n` +
+      `- [x] **A** <!-- id:aaa -->\r\n`;
+    const out = removeArchivedTask(archive, 'aaa');
+    expect(out.removed?.task.title).toBe('A');
+    expect(out.content).not.toContain('\r');
+  });
+
+  it('returns unchanged content + null when the archive has no H2 entries (prelude only)', () => {
+    const out = removeArchivedTask(ARCHIVE_HEADER, 'aaa');
+    expect(out.removed).toBeNull();
+    expect(out.content).toBe(ARCHIVE_HEADER);
+  });
+
+  it('returns null + unchanged content when the body fails to parse (defensive against old-format entries)', () => {
+    // Old-format entry: H2 carries the timestamp + the *task title* (not the
+    // section), and the body is structured prose with no `- [x]` task line.
+    // The id comment is also absent from the prototype's old format, but we
+    // synthesise one here to exercise the parse-fail branch.
+    const archive = `${ARCHIVE_HEADER}\n## 2026-05-18 10:00 — Ship release\n\n**Resolution:**\n\nTagged. <!-- id:abc -->\n\n---\n`;
+    const out = removeArchivedTask(archive, 'abc');
+    expect(out.removed).toBeNull();
+    expect(out.content).toBe(archive);
   });
 });
