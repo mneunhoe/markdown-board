@@ -20,6 +20,7 @@ function task(id: string, overrides: Partial<Task> = {}): Task {
     project: null,
     day: null,
     pomodoros: 0,
+    resolution: '',
     subtasks: [],
     ...overrides,
   };
@@ -93,7 +94,7 @@ describe('appendArchiveEntry', () => {
     const written = await adapter.readFile(ARCHIVE_PATH);
     expect(written).toMatch(/^# Archived Tasks\n/);
     expect(written).toMatch(/## 2026-01-15 14:30 — Active/);
-    expect(written).toContain('- [x] **Write spec** - Shipped it');
+    expect(written).toContain('- [x] **Write spec** - [res: Shipped it]');
   });
 
   it('appends to an existing archive file without re-emitting the header', async () => {
@@ -277,5 +278,33 @@ describe('unresolveTask (slice 6g-3)', () => {
     const vault = activeVault();
     await unresolveTask(adapter, vault, 'abc12345');
     expect(vault.sections[0]?.tasks.map((t) => t.id)).toEqual(['abc12345', 'x']);
+  });
+
+  it('merges [res: …] back into the active note and clears `resolution` (slice 6h)', async () => {
+    // Archive entry has the slice-6h marker; original note is "context".
+    const archive =
+      '# Archived Tasks\n\n## 2026-05-18 10:00 — Active\n\n' +
+      '- [x] **Ship** - [res: shipped on day 1] · context <!-- id:deadbeef -->\n';
+    const adapter = new InMemoryAdapter({ [ARCHIVE_PATH]: archive });
+    const vault = activeVault();
+    const result = await unresolveTask(adapter, vault, 'deadbeef');
+    expect(result.ok).toBe(true);
+    const restored = vault.sections[0]!.tasks[0]!;
+    expect(restored.id).toBe('deadbeef');
+    expect(restored.note).toBe('shipped on day 1 · context');
+    expect(restored.resolution).toBe('');
+  });
+
+  it('restores the resolution-only case (no original note) with the marker text as the note', async () => {
+    const archive =
+      '# Archived Tasks\n\n## 2026-05-18 10:00 — Active\n\n' +
+      '- [x] **Ship** - [res: shipped on day 1] <!-- id:deadbeef -->\n';
+    const adapter = new InMemoryAdapter({ [ARCHIVE_PATH]: archive });
+    const vault = activeVault();
+    const result = await unresolveTask(adapter, vault, 'deadbeef');
+    expect(result.ok).toBe(true);
+    const restored = vault.sections[0]!.tasks[0]!;
+    expect(restored.note).toBe('shipped on day 1');
+    expect(restored.resolution).toBe('');
   });
 });

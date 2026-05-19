@@ -14,6 +14,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     project: null,
     day: null,
     pomodoros: 0,
+    resolution: '',
     subtasks: [],
     ...overrides,
   };
@@ -118,5 +119,27 @@ describe('ArchivedTasksExpander (slice 6g-2)', () => {
     );
     const titles = [...container.querySelectorAll('.card-title')].map((n) => n.textContent?.trim());
     expect(titles).toEqual(['Alpha', 'Bravo', 'Charlie']);
+  });
+
+  it('surfaces the resolution as a separate "Resolution: …" line when present (slice 6h)', async () => {
+    const { container } = render(ArchivedTasksExpander, {
+      tasks: [makeRef({ task: makeTask({ resolution: 'shipped on day 1' }) })],
+    });
+    await fireEvent.click(
+      container.querySelector<HTMLButtonElement>('[data-testid="archived-toggle"]')!,
+    );
+    expect(container.querySelector('[data-testid="archived-resolution"]')?.textContent).toContain(
+      'Resolution: shipped on day 1',
+    );
+  });
+
+  it('omits the Resolution line when the archived task has no resolution', async () => {
+    const { container } = render(ArchivedTasksExpander, {
+      tasks: [makeRef({ task: makeTask({ resolution: '' }) })],
+    });
+    await fireEvent.click(
+      container.querySelector<HTMLButtonElement>('[data-testid="archived-toggle"]')!,
+    );
+    expect(container.querySelector('[data-testid="archived-resolution"]')).toBeNull();
   });
 });

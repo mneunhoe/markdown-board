@@ -154,7 +154,19 @@ export async function unresolveTask(
   const targetSection = matching ?? vault.sections[0]!;
   const usedFallback = matching === null;
 
-  const restored: Task = { ...removed.task, checked: false };
+  // Merge `[res: …]` back into the active note so unresolved tasks
+  // never carry a non-empty `resolution` field. Order matches the
+  // pre-grammar status quo (resolution first, then ` · `, then the
+  // original note). The marker is therefore a write-side concern
+  // visible only inside `archive/TASKS.md`.
+  const { resolution: res, note: orig } = removed.task;
+  const mergedNote = res && orig ? `${res} · ${orig}` : res || orig;
+  const restored: Task = {
+    ...removed.task,
+    checked: false,
+    note: mergedNote,
+    resolution: '',
+  };
   targetSection.tasks.unshift(restored);
   ensureUniqueTaskIds(vault);
 

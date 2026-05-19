@@ -46,6 +46,11 @@
             <div class="archived-meta" data-testid="archived-meta">
               Archived {ref.archivedAt}
             </div>
+            {#if ref.task.resolution}
+              <div class="archived-resolution" data-testid="archived-resolution">
+                Resolution: {ref.task.resolution}
+              </div>
+            {/if}
             <TaskCard
               task={ref.task}
               {...onUnresolve ? { onUnresolve: () => onUnresolve(ref.task.id) } : {}}
@@ -109,5 +114,13 @@
     font-size: 11px;
     color: var(--text-muted);
     margin: 0 0 2px 4px;
+  }
+
+  .archived-resolution {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 0 0 4px 4px;
+    font-style: italic;
+    overflow-wrap: anywhere;
   }
 </style>

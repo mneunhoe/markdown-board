@@ -26,6 +26,17 @@ export interface Task {
   checked: boolean;
   title: string;
   note: string;
+  /**
+   * Resolution note set when the task was last resolved (slice 6h).
+   * Persisted on disk as a `[res: …]` prefix in the §3.5 note position:
+   *   `- [x] **Title** - [res: shipped on day 1] · original note`
+   * Always `''` for active tasks (the unresolve flow merges it into
+   * `note` and clears this field) — surfaces only on archived rows
+   * inside `archive/TASKS.md`. Stored as a separate field so the
+   * round-trip is non-lossy: the archive can distinguish resolution
+   * from original-note even after a future re-resolve.
+   */
+  resolution: string;
   priority: Priority;
   project: string | null;
   day: Day | null;

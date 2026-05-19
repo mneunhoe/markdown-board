@@ -42,7 +42,9 @@ test.describe('vault open + resolve flow', () => {
     // original section, body is a regular `- [x]` task line with the
     // resolution as the inline note.
     expect(files['archive/TASKS.md']).toMatch(/## \d{4}-\d{2}-\d{2} \d{2}:\d{2} — Active/);
-    expect(files['archive/TASKS.md']).toContain('- [x] **[P0] Write spec** - Shipped on day 1');
+    expect(files['archive/TASKS.md']).toContain(
+      '- [x] **[P0] Write spec** - [res: Shipped on day 1]',
+    );
   });
 
   test('cancelling the resolve modal leaves the task in place', async ({ page }) => {

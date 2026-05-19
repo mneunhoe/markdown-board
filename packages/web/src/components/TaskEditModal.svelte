@@ -80,6 +80,10 @@
       checked: task?.checked ?? false,
       title: title.trim(),
       note: note.trim(),
+      // `resolution` is archive-only metadata (slice 6h) — the inline
+      // form editor never exposes it; preserve whatever the original
+      // task carried so the round-trip stays non-lossy.
+      resolution: task?.resolution ?? '',
       priority,
       project: project.trim() ? project.trim() : null,
       day,

@@ -23,6 +23,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     project: null,
     day: null,
     pomodoros: 0,
+    resolution: '',
     subtasks: [],
     ...overrides,
   };
@@ -44,6 +45,7 @@ describe('buildArchiveEntry — task-grammar shape (slice 6f)', () => {
       project: 'markdown-board',
       day: 'Mon',
       pomodoros: 2,
+      resolution: '',
       subtasks: [
         { text: 'done one', checked: true },
         { text: 'skipped two', checked: false },
@@ -55,7 +57,7 @@ describe('buildArchiveEntry — task-grammar shape (slice 6f)', () => {
         '',
         '## 2026-05-18 10:43 — Active',
         '',
-        '- [x] **[P1] [project:markdown-board] [Mon] [pom:2] Ship release** - Tagged and pushed. · tagging v0.1.0 <!-- id:abc12345 -->',
+        '- [x] **[P1] [project:markdown-board] [Mon] [pom:2] Ship release** - [res: Tagged and pushed.] · tagging v0.1.0 <!-- id:abc12345 -->',
         '  - [x] done one',
         '  - [ ] skipped two',
       ].join('\n'),
@@ -101,6 +103,7 @@ describe('buildArchiveEntry — task-grammar shape (slice 6f)', () => {
       project: 'foo',
       day: 'Tue',
       pomodoros: 3,
+      resolution: '',
       subtasks: [{ text: 'a', checked: true }],
     });
     const entry = buildArchiveEntry(task, 'done', makeSection('Done'), { now: NOW });
@@ -116,21 +119,25 @@ describe('buildArchiveEntry — task-grammar shape (slice 6f)', () => {
     expect(round.project).toBe('foo');
     expect(round.day).toBe('Tue');
     expect(round.pomodoros).toBe(3);
-    expect(round.note).toBe('done');
+    // Slice 6h: resolution lives in its own field; the note stays empty
+    // because the original task had no note.
+    expect(round.note).toBe('');
+    expect(round.resolution).toBe('done');
     expect(round.subtasks).toEqual([{ text: 'a', checked: true }]);
     expect(round.id).toBe('abc12345');
   });
 });
 
-describe('buildArchiveEntry — note merge (resolution + original)', () => {
-  it('uses just the resolution when the task has no note', () => {
+describe('buildArchiveEntry — [res: …] marker (slice 6h)', () => {
+  it('emits `[res: …]` alone when the task has no original note', () => {
     const entry = buildArchiveEntry(makeTask(), 'done', makeSection(), { now: NOW });
-    expect(entry).toContain('- [x] **Title** - done');
+    expect(entry).toContain('- [x] **Title** - [res: done]');
   });
 
-  it('uses just the original note when the resolution is empty', () => {
+  it('emits the original note alone when the resolution is empty (no marker)', () => {
     const entry = buildArchiveEntry(makeTask({ note: 'context' }), '', makeSection(), { now: NOW });
     expect(entry).toContain('- [x] **Title** - context');
+    expect(entry).not.toContain('[res:');
   });
 
   it('emits no note suffix when both are empty', () => {
@@ -139,28 +146,35 @@ describe('buildArchiveEntry — note merge (resolution + original)', () => {
     expect(entry).not.toMatch(/\*\* - /);
   });
 
-  it('joins resolution (first) and original note (second) with ` · ` when both are present', () => {
+  it('joins `[res: resolution] · original-note` when both are present', () => {
     const entry = buildArchiveEntry(makeTask({ note: 'context' }), 'done', makeSection(), {
       now: NOW,
     });
-    expect(entry).toContain('- [x] **Title** - done · context');
+    expect(entry).toContain('- [x] **Title** - [res: done] · context');
   });
 
-  it('collapses multi-line resolutions with ` · ` separators', () => {
+  it('collapses multi-line resolutions with ` · ` inside the marker body', () => {
     const entry = buildArchiveEntry(makeTask(), 'line one\nline two\nline three', makeSection(), {
       now: NOW,
     });
-    expect(entry).toContain('- [x] **Title** - line one · line two · line three');
+    expect(entry).toContain('- [x] **Title** - [res: line one · line two · line three]');
   });
 
   it('drops blank lines inside multi-line input before joining', () => {
     const entry = buildArchiveEntry(makeTask(), 'one\n\n\ntwo', makeSection(), { now: NOW });
-    expect(entry).toContain('- [x] **Title** - one · two');
+    expect(entry).toContain('- [x] **Title** - [res: one · two]');
   });
 
   it('trims surrounding whitespace from each line', () => {
     const entry = buildArchiveEntry(makeTask(), '  one  \n  two  ', makeSection(), { now: NOW });
-    expect(entry).toContain('- [x] **Title** - one · two');
+    expect(entry).toContain('- [x] **Title** - [res: one · two]');
+  });
+
+  it('sanitises `]` in the resolution body to `)` so the marker stays unambiguous on re-parse', () => {
+    const entry = buildArchiveEntry(makeTask(), 'shipped (after [much] effort)', makeSection(), {
+      now: NOW,
+    });
+    expect(entry).toContain('- [x] **Title** - [res: shipped (after [much) effort)]');
   });
 });
 
@@ -227,7 +241,7 @@ describe('buildArchiveEntry — line endings (Q4)', () => {
 
   it('normalises CRLF in the resolution input to LF before collapse', () => {
     const entry = buildArchiveEntry(makeTask(), 'one\r\ntwo', makeSection(), { now: NOW });
-    expect(entry).toContain('- [x] **Title** - one · two');
+    expect(entry).toContain('- [x] **Title** - [res: one · two]');
     expect(entry).not.toContain('\r');
   });
 

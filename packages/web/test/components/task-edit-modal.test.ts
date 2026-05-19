@@ -13,6 +13,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     project: null,
     day: null,
     pomodoros: 0,
+    resolution: '',
     subtasks: [],
     ...overrides,
   };
@@ -38,6 +39,7 @@ describe('TaskEditModal (slice 6e)', () => {
         project: 'PSD_GAN',
         day: 'Mon',
         pomodoros: 2,
+        resolution: '',
         subtasks: [{ text: 'first', checked: false }],
       }),
       suggestions: ['PSD_GAN'],

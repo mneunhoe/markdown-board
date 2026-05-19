@@ -30,6 +30,7 @@ function task(id: string, title: string): Task {
     project: null,
     day: null,
     pomodoros: 0,
+    resolution: '',
     subtasks: [],
   };
 }
@@ -425,6 +426,7 @@ describe('setTask (slice 6e)', () => {
         project: 'Foo',
         day: 'Wed',
         pomodoros: 4,
+        resolution: '',
         subtasks: [{ text: 'first', checked: false }],
       },
     );
@@ -453,6 +455,7 @@ describe('setTask (slice 6e)', () => {
         project: null,
         day: null,
         pomodoros: 0,
+        resolution: '',
         subtasks: [],
       },
     );
@@ -475,6 +478,7 @@ describe('setTask (slice 6e)', () => {
           project: null,
           day: null,
           pomodoros: 0,
+          resolution: '',
           subtasks: [],
         },
       ),

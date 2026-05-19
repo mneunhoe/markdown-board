@@ -64,19 +64,6 @@ function collapseToInlineNote(text: string): string {
     .join(' · ');
 }
 
-/**
- * Merge the original task note (left) with the resolution (right) into
- * a single inline note. When both are present, the resolution comes
- * first (it's the most recent context — "what happened"), then ` · `,
- * then the original note ("what it was about"). Either may be empty.
- */
-function mergeNote(original: string, resolution: string): string {
-  const o = collapseToInlineNote(original);
-  const r = collapseToInlineNote(resolution);
-  if (o && r) return `${r} · ${o}`;
-  return r || o;
-}
-
 export function buildArchiveEntry(
   task: Task,
   resolution: string,
@@ -87,14 +74,15 @@ export function buildArchiveEntry(
   const sectionName = normaliseLineEndings(section.name).trim();
   const heading = sectionName ? `## ${ts} — ${sectionName}` : `## ${ts}`;
 
-  // Build the resolved task: merge original note with resolution and
-  // flip `checked = true`. Everything else (title, tokens, subtasks,
-  // id) round-trips verbatim through `emitTaskBlock`.
+  // Flip `checked = true` and stash the resolution in its own field;
+  // the emitter handles formatting as `- [x] **Title** - [res: …] · note`.
+  // Original note + subtasks + tokens + id all round-trip verbatim.
   const resolved: Task = {
     ...task,
     checked: true,
     title: normaliseLineEndings(task.title),
-    note: mergeNote(task.note, resolution),
+    note: collapseToInlineNote(task.note),
+    resolution: collapseToInlineNote(resolution),
     subtasks: task.subtasks.map((st) => ({
       text: normaliseLineEndings(st.text),
       checked: st.checked,

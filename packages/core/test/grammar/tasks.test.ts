@@ -33,6 +33,7 @@ describe('parseTasks — canonical §15.1 example', () => {
               project: 'Foo',
               day: 'Mon',
               pomodoros: 3,
+              resolution: '',
               subtasks: [],
             },
           ],
@@ -268,6 +269,7 @@ describe('toMarkdown — token canonical order', () => {
                 project: null,
                 day: null,
                 pomodoros: 0,
+                resolution: '',
                 subtasks: [],
               },
             ],
@@ -332,6 +334,7 @@ describe('toMarkdown — task body', () => {
               project: null,
               day: null,
               pomodoros: 0,
+              resolution: '',
               subtasks: [],
             },
           ],
@@ -470,6 +473,7 @@ describe('emitTaskBlock + parseTaskBlock — single-task round-trip (slice 6e)',
       project: 'PSD_GAN',
       day: 'Mon',
       pomodoros: 2,
+      resolution: '',
       subtasks: [
         { text: 'first', checked: false },
         { text: 'second', checked: true },
@@ -493,6 +497,7 @@ describe('emitTaskBlock + parseTaskBlock — single-task round-trip (slice 6e)',
       project: 'PSD_GAN',
       day: 'Mon' as const,
       pomodoros: 2,
+      resolution: '',
       subtasks: [
         { text: 'first', checked: false },
         { text: 'second', checked: true },
@@ -531,5 +536,96 @@ describe('emitTaskBlock + parseTaskBlock — single-task round-trip (slice 6e)',
     const parsed = parseTaskBlock('- [ ] Title\r\n  - [ ] Sub');
     expect(parsed?.title).toBe('Title');
     expect(parsed?.subtasks).toEqual([{ text: 'Sub', checked: false }]);
+  });
+});
+
+describe('[res: …] marker — parser + emitter (slice 6h)', () => {
+  it('peels `[res: …]` out of the note position into Task.resolution', () => {
+    const vault = parseTasks('## Active\n- [x] **Title** - [res: shipped] · original note\n');
+    const task = vault.sections[0]!.tasks[0]!;
+    expect(task.resolution).toBe('shipped');
+    expect(task.note).toBe('original note');
+  });
+
+  it('handles `[res: …]` alone with no original note', () => {
+    const vault = parseTasks('## Active\n- [x] **Title** - [res: shipped]\n');
+    const task = vault.sections[0]!.tasks[0]!;
+    expect(task.resolution).toBe('shipped');
+    expect(task.note).toBe('');
+  });
+
+  it('treats absence of the marker as no resolution (legacy / hand-written notes)', () => {
+    const vault = parseTasks('## Active\n- [x] **Title** - just a regular note\n');
+    const task = vault.sections[0]!.tasks[0]!;
+    expect(task.resolution).toBe('');
+    expect(task.note).toBe('just a regular note');
+  });
+
+  it('emits `[res: …] · note` from Task.resolution + Task.note', () => {
+    const vault = parseTasks('## Active\n- [x] **Title** - [res: shipped] · context\n');
+    const out = toMarkdown(vault);
+    expect(out).toContain('- [x] **Title** - [res: shipped] · context');
+  });
+
+  it('round-trips a non-trivial resolution + note + tokens byte-stably on the second trip', () => {
+    const input =
+      '## Active\n- [x] **[P0] [project:Foo] [Mon] Ship** - [res: shipped] · context <!-- id:deadbeef -->\n';
+    const first = toMarkdown(parseTasks(input));
+    const second = toMarkdown(parseTasks(first));
+    expect(second).toBe(first);
+  });
+
+  it('sanitises `]` in resolution to `)` on emit so the marker stays unambiguous', () => {
+    const out = toMarkdown({
+      prelude: '',
+      sections: [
+        {
+          id: 'a',
+          name: 'Active',
+          tasks: [
+            {
+              id: '',
+              checked: true,
+              title: 'T',
+              note: '',
+              resolution: 'shipped (after [much] effort)',
+              priority: null,
+              project: null,
+              day: null,
+              pomodoros: 0,
+              subtasks: [],
+            },
+          ],
+        },
+      ],
+    });
+    expect(out).toContain('- [x] **T** - [res: shipped (after [much) effort)]');
+  });
+
+  it('emits no note suffix when both resolution and note are empty', () => {
+    const out = toMarkdown({
+      prelude: '',
+      sections: [
+        {
+          id: 'a',
+          name: 'Active',
+          tasks: [
+            {
+              id: '',
+              checked: false,
+              title: 'T',
+              note: '',
+              resolution: '',
+              priority: null,
+              project: null,
+              day: null,
+              pomodoros: 0,
+              subtasks: [],
+            },
+          ],
+        },
+      ],
+    });
+    expect(out).toMatch(/- \[ \] \*\*T\*\*\n/);
   });
 });

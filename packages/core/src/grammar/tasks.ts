@@ -16,6 +16,10 @@ const PROJECT_RE = /^\s*\[\s*project:\s*([^\]]+?)\s*\]\s+(.+)$/i;
 const DAY_RE =
   /^\s*\[\s*(mon(?:day)?|tue(?:s|sday)?|wed(?:s|nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\s*\]\s+(.+)$/i;
 const POM_RE = /^\s*\[\s*pom:\s*(\d+)\s*\]\s+(.+)$/i;
+// `[res: …]` prefix in the §3.5 note position. The body matches up to
+// the first `]` (writers sanitise `]` to `)` to avoid the ambiguity),
+// optionally followed by ` · {original note}`.
+const RES_PREFIX_RE = /^\[res:\s*([^\]]*?)\s*\](?:\s*·\s+(.+))?$/;
 
 /**
  * Compute a section's runtime id from its display name. Lowercases,
@@ -145,7 +149,8 @@ function parseTaskBody(body: string, checked: boolean): Task {
     noteRaw = '';
   }
 
-  const note = noteRaw.replace(/^\s*-\s*/, '').trim();
+  const rawNote = noteRaw.replace(/^\s*-\s*/, '').trim();
+  const { resolution, note } = peelResolution(rawNote);
   const { title, tokens } = peelTokens(titleRaw);
 
   return {
@@ -153,12 +158,19 @@ function parseTaskBody(body: string, checked: boolean): Task {
     checked,
     title,
     note,
+    resolution,
     priority: tokens.priority,
     project: tokens.project,
     day: tokens.day,
     pomodoros: tokens.pomodoros,
     subtasks: [],
   };
+}
+
+function peelResolution(rawNote: string): { resolution: string; note: string } {
+  const m = RES_PREFIX_RE.exec(rawNote);
+  if (!m) return { resolution: '', note: rawNote };
+  return { resolution: m[1] ?? '', note: (m[2] ?? '').trim() };
 }
 
 function parseSubtask(body: string, checked: boolean): Subtask {
@@ -248,7 +260,7 @@ function emitTokens(task: Task): string {
 function emitTask(task: Task): string {
   const checkbox = task.checked ? '[x]' : '[ ]';
   const titleBody = `${emitTokens(task)}${task.title}`;
-  const note = task.note ? ` - ${task.note}` : '';
+  const note = formatNoteSuffix(task);
   const idSuffix = task.id ? ` <!-- id:${task.id} -->` : '';
   let out = `- ${checkbox} **${titleBody}**${note}${idSuffix}\n`;
   for (const st of task.subtasks) {
@@ -256,6 +268,17 @@ function emitTask(task: Task): string {
     out += `  - ${sc} ${st.text}\n`;
   }
   return out;
+}
+
+function formatNoteSuffix(task: Task): string {
+  // `]` in the resolution would terminate the `[res: …]` marker on
+  // re-parse, so sanitise it to `)` on the way out. Lossy but rare.
+  const resBody = task.resolution.trim().replace(/\]/g, ')');
+  const noteBody = task.note.trim();
+  if (!resBody && !noteBody) return '';
+  if (!resBody) return ` - ${noteBody}`;
+  if (!noteBody) return ` - [res: ${resBody}]`;
+  return ` - [res: ${resBody}] · ${noteBody}`;
 }
 
 /**
