@@ -25,8 +25,11 @@ export {
 } from './lib/dnd.js';
 export { type ResolveHandler, type ResolveTarget } from './lib/resolve.js';
 export {
+  type DayEditOpenHandler,
   type EditTarget,
   type NoteEditHandler,
+  type PriorityCycleHandler,
+  type ProjectEditOpenHandler,
   type SubtaskAddHandler,
   type SubtaskEditHandler,
   type SubtaskToggleHandler,

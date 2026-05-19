@@ -5,7 +5,10 @@
   import type { TaskMoveHandler } from '../lib/dnd.js';
   import type { ResolveHandler } from '../lib/resolve.js';
   import type {
+    DayEditOpenHandler,
     NoteEditHandler,
+    PriorityCycleHandler,
+    ProjectEditOpenHandler,
     SubtaskAddHandler,
     SubtaskEditHandler,
     SubtaskToggleHandler,
@@ -37,6 +40,9 @@
     onSubtaskAdd?: SubtaskAddHandler;
     onSubtaskToggle?: SubtaskToggleHandler;
     onTaskDelete?: TaskDeleteHandler;
+    onPriorityCycle?: PriorityCycleHandler;
+    onProjectEdit?: ProjectEditOpenHandler;
+    onDayEdit?: DayEditOpenHandler;
   }
 
   const {
@@ -51,6 +57,9 @@
     onSubtaskAdd,
     onSubtaskToggle,
     onTaskDelete,
+    onPriorityCycle,
+    onProjectEdit,
+    onDayEdit,
   }: Props = $props();
 
   const hasSections = $derived(vault.sections.length > 0);
@@ -134,6 +143,24 @@
                 {...onTaskDelete
                   ? {
                       onDelete: () => onTaskDelete({ taskId: task.id, sectionId: section.id }),
+                    }
+                  : {}}
+                {...onPriorityCycle
+                  ? {
+                      onPriorityCycle: () =>
+                        onPriorityCycle({ taskId: task.id, sectionId: section.id }),
+                    }
+                  : {}}
+                {...onProjectEdit
+                  ? {
+                      onProjectEdit: () =>
+                        onProjectEdit({ taskId: task.id, sectionId: section.id }, task.project),
+                    }
+                  : {}}
+                {...onDayEdit
+                  ? {
+                      onDayEdit: () =>
+                        onDayEdit({ taskId: task.id, sectionId: section.id }, task.day),
                     }
                   : {}}
               />

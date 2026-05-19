@@ -3,12 +3,17 @@ import { describe, expect, it } from 'vitest';
 
 import {
   addSubtask,
+  allProjects,
+  cycleTaskPriority,
   deleteTask,
   ensureUniqueTaskIds,
   moveColumn,
   moveTask,
   setSubtaskText,
+  setTaskDay,
   setTaskNote,
+  setTaskPriority,
+  setTaskProject,
   setTaskTitle,
   toggleSubtask,
 } from '../../../src/lib/vault/mutate.js';
@@ -294,5 +299,75 @@ describe('addSubtask', () => {
     const v = vault();
     expect(addSubtask(v, { taskId: 'a', sectionId: 'active' }, '')).toBe(false);
     expect(v.sections[0]?.tasks[0]?.subtasks).toHaveLength(0);
+  });
+});
+
+describe('setTaskPriority / cycleTaskPriority', () => {
+  it('sets the priority directly', () => {
+    const v = vault();
+    setTaskPriority(v, { taskId: 'a', sectionId: 'active' }, 'high');
+    expect(v.sections[0]?.tasks[0]?.priority).toBe('high');
+    setTaskPriority(v, { taskId: 'a', sectionId: 'active' }, null);
+    expect(v.sections[0]?.tasks[0]?.priority).toBeNull();
+  });
+
+  it('cycles through null → blocker → high → low → null (slice 6b extends prototype)', () => {
+    const v = vault();
+    expect(v.sections[0]?.tasks[0]?.priority).toBeNull();
+    cycleTaskPriority(v, { taskId: 'a', sectionId: 'active' });
+    expect(v.sections[0]?.tasks[0]?.priority).toBe('blocker');
+    cycleTaskPriority(v, { taskId: 'a', sectionId: 'active' });
+    expect(v.sections[0]?.tasks[0]?.priority).toBe('high');
+    cycleTaskPriority(v, { taskId: 'a', sectionId: 'active' });
+    expect(v.sections[0]?.tasks[0]?.priority).toBe('low');
+    cycleTaskPriority(v, { taskId: 'a', sectionId: 'active' });
+    expect(v.sections[0]?.tasks[0]?.priority).toBeNull();
+  });
+});
+
+describe('setTaskProject', () => {
+  it('sets the project tag and trims whitespace', () => {
+    const v = vault();
+    setTaskProject(v, { taskId: 'a', sectionId: 'active' }, '  Foo  ');
+    expect(v.sections[0]?.tasks[0]?.project).toBe('Foo');
+  });
+
+  it('treats empty / whitespace-only input as a clear', () => {
+    const v = vault();
+    setTaskProject(v, { taskId: 'a', sectionId: 'active' }, 'X');
+    setTaskProject(v, { taskId: 'a', sectionId: 'active' }, '   ');
+    expect(v.sections[0]?.tasks[0]?.project).toBeNull();
+    setTaskProject(v, { taskId: 'a', sectionId: 'active' }, 'X');
+    setTaskProject(v, { taskId: 'a', sectionId: 'active' }, null);
+    expect(v.sections[0]?.tasks[0]?.project).toBeNull();
+  });
+});
+
+describe('setTaskDay', () => {
+  it('sets the day token', () => {
+    const v = vault();
+    setTaskDay(v, { taskId: 'a', sectionId: 'active' }, 'Wed');
+    expect(v.sections[0]?.tasks[0]?.day).toBe('Wed');
+  });
+
+  it('clears the day token when next is null', () => {
+    const v = vault();
+    setTaskDay(v, { taskId: 'a', sectionId: 'active' }, 'Mon');
+    setTaskDay(v, { taskId: 'a', sectionId: 'active' }, null);
+    expect(v.sections[0]?.tasks[0]?.day).toBeNull();
+  });
+});
+
+describe('allProjects', () => {
+  it('returns a sorted unique list across all sections', () => {
+    const v = vault();
+    if (v.sections[0]?.tasks[0]) v.sections[0].tasks[0].project = 'Beta';
+    if (v.sections[0]?.tasks[1]) v.sections[0].tasks[1].project = 'Alpha';
+    if (v.sections[1]?.tasks[0]) v.sections[1].tasks[0].project = 'Beta';
+    expect(allProjects(v)).toEqual(['Alpha', 'Beta']);
+  });
+
+  it('returns [] when no tasks have projects', () => {
+    expect(allProjects(vault())).toEqual([]);
   });
 });

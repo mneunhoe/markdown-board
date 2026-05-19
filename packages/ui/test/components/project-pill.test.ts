@@ -1,5 +1,5 @@
-import { render } from '@testing-library/svelte';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render } from '@testing-library/svelte';
+import { describe, expect, it, vi } from 'vitest';
 import ProjectPill from '../../src/components/ProjectPill.svelte';
 import { projectColor } from '../../src/lib/project.js';
 
@@ -45,5 +45,35 @@ describe('ProjectPill', () => {
     expect(container.querySelector('.project-pill')?.getAttribute('aria-label')).toBe(
       'project PSD_GAN',
     );
+  });
+
+  describe('onEdit (slice 6b)', () => {
+    it('without onEdit, null project renders nothing', () => {
+      const { container } = render(ProjectPill, { project: null });
+      expect(container.querySelector('.project-pill')).toBeNull();
+    });
+
+    it('with onEdit and null project, renders a "+ Project" hover affordance', () => {
+      const { container } = render(ProjectPill, { project: null, onEdit: () => {} });
+      const btn = container.querySelector<HTMLButtonElement>('[data-testid="project-add"]');
+      expect(btn).toBeTruthy();
+      expect(btn?.classList.contains('project-empty')).toBe(true);
+    });
+
+    it('with onEdit and a project set, the pill becomes a button', () => {
+      const { container } = render(ProjectPill, { project: 'PSD_GAN', onEdit: () => {} });
+      const btn = container.querySelector<HTMLButtonElement>('[data-testid="project-pill"]');
+      expect(btn).toBeTruthy();
+      expect(btn?.textContent?.trim()).toBe('PSD_GAN');
+    });
+
+    it('clicking calls onEdit', async () => {
+      const onEdit = vi.fn();
+      const { container } = render(ProjectPill, { project: 'PSD_GAN', onEdit });
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="project-pill"]')!,
+      );
+      expect(onEdit).toHaveBeenCalledOnce();
+    });
   });
 });

@@ -9,12 +9,17 @@ export { Autosaver, type AutosaverOptions } from './autosave.js';
 export { ExternalChangeWatcher, type ExternalChangeWatcherOptions } from './watcher.js';
 export {
   addSubtask,
+  allProjects,
+  cycleTaskPriority,
   deleteTask,
   ensureUniqueTaskIds,
   moveColumn,
   moveTask,
   setSubtaskText,
+  setTaskDay,
   setTaskNote,
+  setTaskPriority,
+  setTaskProject,
   setTaskTitle,
   toggleSubtask,
   type ColumnMove,

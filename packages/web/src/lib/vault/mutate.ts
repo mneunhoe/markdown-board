@@ -6,7 +6,8 @@
 // Returns `boolean` (rather than throwing) so the autosave $effect can
 // short-circuit silently if a stale handle / no-op move sneaks through.
 
-import type { Vault } from '@markdown-board/core';
+import { nextPriority } from '@markdown-board/core';
+import type { Day, Priority, Vault } from '@markdown-board/core';
 
 export interface TaskMove {
   taskId: string;
@@ -152,4 +153,51 @@ export function addSubtask(vault: Vault, target: TaskTarget, text: string): bool
   if (!text) return false;
   task.subtasks.push({ text, checked: false });
   return true;
+}
+
+export function setTaskPriority(vault: Vault, target: TaskTarget, next: Priority): boolean {
+  const found = findTaskInVault(vault, target);
+  const task = found && found.tasks[found.idx];
+  if (!task) return false;
+  task.priority = next;
+  return true;
+}
+
+export function cycleTaskPriority(vault: Vault, target: TaskTarget): boolean {
+  const found = findTaskInVault(vault, target);
+  const task = found && found.tasks[found.idx];
+  if (!task) return false;
+  task.priority = nextPriority(task.priority);
+  return true;
+}
+
+export function setTaskProject(vault: Vault, target: TaskTarget, next: string | null): boolean {
+  const found = findTaskInVault(vault, target);
+  const task = found && found.tasks[found.idx];
+  if (!task) return false;
+  task.project = next && next.trim() ? next.trim() : null;
+  return true;
+}
+
+export function setTaskDay(vault: Vault, target: TaskTarget, next: Day | null): boolean {
+  const found = findTaskInVault(vault, target);
+  const task = found && found.tasks[found.idx];
+  if (!task) return false;
+  task.day = next;
+  return true;
+}
+
+/**
+ * Collect the unique short-project names across the vault (sorted).
+ * Used to pre-fill the project picker's `<datalist>` (mirrors
+ * `allProjects()` in `dashboard.html:2614-2625`).
+ */
+export function allProjects(vault: Vault): string[] {
+  const set = new Set<string>();
+  for (const section of vault.sections) {
+    for (const task of section.tasks) {
+      if (task.project) set.add(task.project);
+    }
+  }
+  return Array.from(set).sort();
 }

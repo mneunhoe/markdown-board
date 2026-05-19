@@ -1,10 +1,14 @@
 <script lang="ts">
   import { toMarkdown } from '@markdown-board/core';
-  import type { Section, Task } from '@markdown-board/core';
+  import type { Day, Section, Task } from '@markdown-board/core';
   import {
     EmptyState,
     type ColumnMoveHandler,
+    type DayEditOpenHandler,
+    type EditTarget,
     type NoteEditHandler,
+    type PriorityCycleHandler,
+    type ProjectEditOpenHandler,
     type ResolveHandler,
     type SubtaskAddHandler,
     type SubtaskEditHandler,
@@ -14,6 +18,8 @@
     type TitleEditHandler,
   } from '@markdown-board/ui';
   import { FSAFileAdapter } from './lib/adapters/index.js';
+  import DayPickerModal from './components/DayPickerModal.svelte';
+  import ProjectPickerModal from './components/ProjectPickerModal.svelte';
   import ResolveModal from './components/ResolveModal.svelte';
   import SettingsModal from './components/SettingsModal.svelte';
   import VaultWorkspace from './components/VaultWorkspace.svelte';
@@ -24,7 +30,9 @@
     FileSystemAccessUnsupportedError,
     VaultPickerCancelledError,
     addSubtask,
+    allProjects,
     appendArchiveEntry,
+    cycleTaskPriority,
     deleteTask,
     findTask,
     isFileSystemAccessSupported,
@@ -34,7 +42,9 @@
     pickVaultDirectory,
     removeTask,
     setSubtaskText,
+    setTaskDay,
     setTaskNote,
+    setTaskProject,
     setTaskTitle,
     toggleSubtask,
     type LoadedVault,
@@ -51,6 +61,11 @@
   let resolving = $state(false);
   let settings = $state<Settings>(loadSettings());
   let settingsOpen = $state(false);
+  // Slice 6b picker state. A non-null `target` opens the corresponding
+  // modal. The target is captured at open-time so a concurrent external
+  // reload can't shift the picker between picks.
+  let projectPicker = $state<{ target: EditTarget; current: string | null } | null>(null);
+  let dayPicker = $state<{ target: EditTarget; current: Day | null } | null>(null);
 
   let adapter: FSAFileAdapter | null = null;
   let autosaver: Autosaver | null = null;
@@ -177,6 +192,47 @@
     deleteTask(loaded.vault, target);
   };
 
+  const onPriorityCycle: PriorityCycleHandler = (target) => {
+    if (!loaded) return;
+    cycleTaskPriority(loaded.vault, target);
+  };
+
+  const onProjectEdit: ProjectEditOpenHandler = (target, current) => {
+    projectPicker = { target, current };
+  };
+
+  const onDayEdit: DayEditOpenHandler = (target, current) => {
+    dayPicker = { target, current };
+  };
+
+  function confirmProjectPicker(next: string | null): void {
+    if (!projectPicker || !loaded) {
+      projectPicker = null;
+      return;
+    }
+    setTaskProject(loaded.vault, projectPicker.target, next);
+    projectPicker = null;
+  }
+
+  function cancelProjectPicker(): void {
+    projectPicker = null;
+  }
+
+  function confirmDayPicker(next: Day | null): void {
+    if (!dayPicker || !loaded) {
+      dayPicker = null;
+      return;
+    }
+    setTaskDay(loaded.vault, dayPicker.target, next);
+    dayPicker = null;
+  }
+
+  function cancelDayPicker(): void {
+    dayPicker = null;
+  }
+
+  const projectSuggestions = $derived(loaded ? allProjects(loaded.vault) : []);
+
   async function confirmResolve(resolution: string): Promise<void> {
     if (!resolveTarget || !adapter || !loaded || resolving) return;
     const { task, section } = resolveTarget;
@@ -270,6 +326,9 @@
         {onSubtaskAdd}
         {onSubtaskToggle}
         {onTaskDelete}
+        {onPriorityCycle}
+        {onProjectEdit}
+        {onDayEdit}
       />
     {:else if !supported}
       <EmptyState
@@ -309,6 +368,21 @@
     {settings}
     onChange={handleSettingsChange}
     onClose={() => (settingsOpen = false)}
+  />
+
+  <ProjectPickerModal
+    open={projectPicker !== null}
+    current={projectPicker?.current ?? null}
+    suggestions={projectSuggestions}
+    onConfirm={confirmProjectPicker}
+    onCancel={cancelProjectPicker}
+  />
+
+  <DayPickerModal
+    open={dayPicker !== null}
+    current={dayPicker?.current ?? null}
+    onConfirm={confirmDayPicker}
+    onCancel={cancelDayPicker}
   />
 </main>
 

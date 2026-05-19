@@ -1,5 +1,18 @@
 export type Priority = 'blocker' | 'high' | 'low' | null;
 
+/**
+ * Click-to-cycle order for the priority chip. Matches the prototype's
+ * `cycleTaskPriority` (`dashboard.html:2639-2643`) extended with `blocker`
+ * as a first-class fourth state — the prototype predates [P0] as a cycled
+ * tier, but our grammar surface (§3.6) treats it the same as the rest.
+ */
+export const PRIORITY_CYCLE: readonly Priority[] = [null, 'blocker', 'high', 'low'];
+
+export function nextPriority(current: Priority): Priority {
+  const i = PRIORITY_CYCLE.indexOf(current);
+  return PRIORITY_CYCLE[(i + 1) % PRIORITY_CYCLE.length] ?? null;
+}
+
 export const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 export type Day = (typeof WEEK_DAYS)[number];
 

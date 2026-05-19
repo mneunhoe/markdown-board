@@ -6,7 +6,10 @@
     ListView,
     OverviewView,
     type ColumnMoveHandler,
+    type DayEditOpenHandler,
     type NoteEditHandler,
+    type PriorityCycleHandler,
+    type ProjectEditOpenHandler,
     type ResolveHandler,
     type SubtaskAddHandler,
     type SubtaskEditHandler,
@@ -33,6 +36,9 @@
     onSubtaskAdd?: SubtaskAddHandler;
     onSubtaskToggle?: SubtaskToggleHandler;
     onTaskDelete?: TaskDeleteHandler;
+    onPriorityCycle?: PriorityCycleHandler;
+    onProjectEdit?: ProjectEditOpenHandler;
+    onDayEdit?: DayEditOpenHandler;
   }
 
   const {
@@ -47,6 +53,9 @@
     onSubtaskAdd,
     onSubtaskToggle,
     onTaskDelete,
+    onPriorityCycle,
+    onProjectEdit,
+    onDayEdit,
   }: Props = $props();
 
   let active = $state<TabKey>('board');
@@ -62,6 +71,9 @@
     ...(onSubtaskAdd ? { onSubtaskAdd } : {}),
     ...(onSubtaskToggle ? { onSubtaskToggle } : {}),
     ...(onTaskDelete ? { onTaskDelete } : {}),
+    ...(onPriorityCycle ? { onPriorityCycle } : {}),
+    ...(onProjectEdit ? { onProjectEdit } : {}),
+    ...(onDayEdit ? { onDayEdit } : {}),
   });
   const boardMoveProps = $derived({
     ...(onTaskMove ? { onTaskMove } : {}),

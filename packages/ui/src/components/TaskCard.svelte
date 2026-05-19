@@ -25,6 +25,12 @@
     onSubtaskToggle?: (idx: number) => void;
     /** When provided, a delete (×) button appears on the card row. */
     onDelete?: () => void;
+    /** Slice 6b — click PriorityBadge to cycle the tier. */
+    onPriorityCycle?: () => void;
+    /** Slice 6b — click ProjectPill (or "+ Project" hint) to open the picker. */
+    onProjectEdit?: () => void;
+    /** Slice 6b — click DayChip (or "+ Day" hint) to open the picker. */
+    onDayEdit?: () => void;
   }
 
   const {
@@ -36,6 +42,9 @@
     onSubtaskAdd,
     onSubtaskToggle,
     onDelete,
+    onPriorityCycle,
+    onProjectEdit,
+    onDayEdit,
   }: Props = $props();
 
   const checkboxInteractive = $derived(onResolve !== undefined);
@@ -182,9 +191,12 @@
   {/if}
 
   <div class="card-chips">
-    <ProjectPill project={task.project} />
-    <PriorityBadge priority={task.priority} />
-    <DayChip day={task.day} />
+    <ProjectPill project={task.project} {...onProjectEdit ? { onEdit: onProjectEdit } : {}} />
+    <PriorityBadge
+      priority={task.priority}
+      {...onPriorityCycle ? { onCycle: onPriorityCycle } : {}}
+    />
+    <DayChip day={task.day} {...onDayEdit ? { onEdit: onDayEdit } : {}} />
     {#if task.pomodoros > 0}
       <span class="pom-count" aria-label="{task.pomodoros} pomodoros">🍅 {task.pomodoros}</span>
     {/if}
