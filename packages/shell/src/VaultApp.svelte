@@ -275,6 +275,7 @@
         lastWrittenMd = md;
         lastSyncedMtime = await safeMtime(next, TASKS_PATH);
         watcher?.setBaseline(lastSyncedMtime);
+        pluginHost.hooks.emit('vault.saved', { vaultPath });
       },
       onError: (err: unknown) => {
         error = `Autosave failed: ${err instanceof Error ? err.message : String(err)}`;
@@ -313,6 +314,10 @@
     // The just-opened vault is now the most-recent; reflect that so the
     // empty state shows it first next time the user opens another vault.
     refreshRecents();
+    // Activate plugins for this vault, then announce the open so plugins that
+    // subscribed during activation receive it.
+    await syncPlugins();
+    pluginHost.hooks.emit('vault.opened', { vaultPath });
   }
 
   async function applyVaultTheme(): Promise<void> {
@@ -404,7 +409,27 @@
 
   // Reconcile active plugins against the desired set (enabled + a vault open).
   // Idempotent: safe to call on vault open, vault switch, and settings toggles.
+  // Serialised so concurrent triggers can't double-activate the same plugin.
+  let syncing = false;
+  let resyncQueued = false;
   async function syncPlugins(): Promise<void> {
+    if (syncing) {
+      resyncQueued = true;
+      return;
+    }
+    syncing = true;
+    try {
+      await reconcilePlugins();
+    } finally {
+      syncing = false;
+      if (resyncQueued) {
+        resyncQueued = false;
+        await syncPlugins();
+      }
+    }
+  }
+
+  async function reconcilePlugins(): Promise<void> {
     const currentAdapter = adapter;
     if (!loaded || !currentAdapter) {
       await teardownPlugins();
@@ -509,29 +534,43 @@
     resolveTarget = found;
   };
 
-  const onTitleEdit: TitleEditHandler = (target, next) => {
+  // Run a task mutation and emit `task.updated` with before/after snapshots.
+  // Best-effort: covers the explicit edit handlers below (not every nested
+  // proxy write). Snapshots are detached clones so `before` isn't mutated.
+  function withTaskUpdate(target: EditTarget, apply: () => void): void {
     if (!loaded) return;
-    setTaskTitle(loaded.vault, target, next);
+    const before = findTask(loaded.vault, target)?.task;
+    const snapshot = before ? $state.snapshot(before) : null;
+    apply();
+    if (!loaded || !snapshot) return;
+    const after = findTask(loaded.vault, target)?.task;
+    if (after) {
+      pluginHost.hooks.emit('task.updated', {
+        ref: target,
+        before: snapshot,
+        after: $state.snapshot(after),
+      });
+    }
+  }
+
+  const onTitleEdit: TitleEditHandler = (target, next) => {
+    withTaskUpdate(target, () => setTaskTitle(loaded!.vault, target, next));
   };
 
   const onNoteEdit: NoteEditHandler = (target, next) => {
-    if (!loaded) return;
-    setTaskNote(loaded.vault, target, next);
+    withTaskUpdate(target, () => setTaskNote(loaded!.vault, target, next));
   };
 
   const onSubtaskEdit: SubtaskEditHandler = (target, idx, next) => {
-    if (!loaded) return;
-    setSubtaskText(loaded.vault, target, idx, next);
+    withTaskUpdate(target, () => setSubtaskText(loaded!.vault, target, idx, next));
   };
 
   const onSubtaskAdd: SubtaskAddHandler = (target, text) => {
-    if (!loaded) return;
-    addSubtask(loaded.vault, target, text);
+    withTaskUpdate(target, () => addSubtask(loaded!.vault, target, text));
   };
 
   const onSubtaskToggle: SubtaskToggleHandler = (target, idx) => {
-    if (!loaded) return;
-    toggleSubtask(loaded.vault, target, idx);
+    withTaskUpdate(target, () => toggleSubtask(loaded!.vault, target, idx));
   };
 
   const onTaskDelete: TaskDeleteHandler = (target) => {
@@ -540,8 +579,7 @@
   };
 
   const onPriorityCycle: PriorityCycleHandler = (target) => {
-    if (!loaded) return;
-    cycleTaskPriority(loaded.vault, target);
+    withTaskUpdate(target, () => cycleTaskPriority(loaded!.vault, target));
   };
 
   const onProjectEdit: ProjectEditOpenHandler = (target, current) => {
@@ -567,6 +605,14 @@
     const id = addTaskToSection(loaded.vault, sectionId, title);
     if (!id) {
       error = "Couldn't add the task — the section may have been removed.";
+      return;
+    }
+    const created = findTask(loaded.vault, { taskId: id, sectionId });
+    if (created) {
+      pluginHost.hooks.emit('task.created', {
+        ref: { taskId: id, sectionId },
+        task: $state.snapshot(created.task),
+      });
     }
   };
 
@@ -642,7 +688,8 @@
       taskEditor = null;
       return;
     }
-    setTask(loaded.vault, taskEditor.target, next);
+    const { target } = taskEditor;
+    withTaskUpdate(target, () => setTask(loaded!.vault, target, next));
     taskEditor = null;
   }
 
@@ -655,7 +702,8 @@
       projectPicker = null;
       return;
     }
-    setTaskProject(loaded.vault, projectPicker.target, next);
+    const { target } = projectPicker;
+    withTaskUpdate(target, () => setTaskProject(loaded!.vault, target, next));
     projectPicker = null;
   }
 
@@ -668,7 +716,8 @@
       dayPicker = null;
       return;
     }
-    setTaskDay(loaded.vault, dayPicker.target, next);
+    const { target } = dayPicker;
+    withTaskUpdate(target, () => setTaskDay(loaded!.vault, target, next));
     dayPicker = null;
   }
 
@@ -768,6 +817,11 @@
       await autosaver?.flush();
       await appendArchiveEntry(adapter, task, resolution, section, { profile: grammarProfile });
       removeTask(loaded.vault, { taskId: task.id, sectionId: section.id });
+      pluginHost.hooks.emit('task.resolved', {
+        ref: { taskId: task.id, sectionId: section.id },
+        task: $state.snapshot(task),
+        resolution,
+      });
       // Refresh the in-memory archive Vault so the Archived expander
       // under the source column updates in the same render frame.
       await refreshArchive();
@@ -785,9 +839,12 @@
   }
 
   function handleSettingsChange(next: Settings): void {
+    const prevPlugins = settings.plugins;
     settings = next;
     saveSettings(next);
     applyTheme(next.theme);
+    // Re-reconcile when the per-plugin enable flags changed (live enable/disable).
+    if (next.plugins !== prevPlugins) void syncPlugins();
   }
 
   function toggleTheme(): void {
@@ -982,15 +1039,6 @@
   // Seed the recent-vaults list once the platform is available.
   $effect(() => {
     refreshRecents();
-  });
-
-  // Reconcile plugins whenever a vault opens/closes or the per-plugin
-  // enable flags change. Reading `loaded` + `settings.plugins` registers the
-  // deps; `syncPlugins` is idempotent so re-runs are cheap.
-  $effect(() => {
-    void loaded;
-    void settings.plugins;
-    void syncPlugins();
   });
 </script>
 
