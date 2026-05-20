@@ -25,6 +25,7 @@ describe('loadSettings / saveSettings', () => {
       autosaveDelayMs: 750,
       projectColorOverrides: { PSD_GAN: '#ff0000' },
       shortcuts: { 'go-board': 'Mod+B' },
+      plugins: { pomodoro: { enabled: false, focus: 30 } },
     };
     saveSettings(settings);
     expect(loadSettings()).toEqual(settings);
@@ -46,6 +47,24 @@ describe('loadSettings / saveSettings', () => {
     expect(loaded.autosaveDelayMs).toBe(DEFAULT_SETTINGS.autosaveDelayMs);
     expect(loaded.projectColorOverrides).toEqual({});
     expect(loaded.shortcuts).toEqual({});
+    expect(loaded.plugins).toEqual({});
+  });
+
+  it('parses per-plugin entries, defaulting enabled to true when absent', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        plugins: {
+          pomodoro: { focus: 30 },
+          'week-view': { enabled: false },
+          bogus: 'not-an-object',
+        },
+      }),
+    );
+    expect(loadSettings().plugins).toEqual({
+      pomodoro: { enabled: true, focus: 30 },
+      'week-view': { enabled: false },
+    });
   });
 
   it('keeps string shortcut overrides, including empty (unbind) values', () => {
@@ -85,6 +104,7 @@ describe('loadSettings / saveSettings', () => {
       autosaveDelayMs: 500,
       projectColorOverrides: {},
       shortcuts: {},
+      plugins: {},
     };
     saveSettings(settings);
     expect(localStorage.getItem(STORAGE_KEY)).toBe(JSON.stringify(settings));

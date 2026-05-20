@@ -38,8 +38,17 @@
   import SettingsModal from './components/SettingsModal.svelte';
   import TaskEditModal from './components/TaskEditModal.svelte';
   import VaultWorkspace from './components/VaultWorkspace.svelte';
+  import {
+    PLUGIN_API_VERSION,
+    type Disposable,
+    type PluginContext,
+  } from '@markdown-board/plugin-api';
   import { type Command } from './lib/commands.js';
   import { createPluginHost } from './lib/plugins/registry.svelte.js';
+  import { FIRST_PARTY_PLUGINS, type FirstPartyPlugin } from './lib/plugins/first-party.js';
+  import { activatePlugin, type PluginHandle } from './lib/plugins/loader.js';
+  import { createScopedStorage } from './lib/plugins/storage.js';
+  import { resolvePluginSettings } from './lib/plugins/plugin-settings.js';
   import {
     buildSearchDocs,
     createSearchIndex,
@@ -151,6 +160,11 @@
   const pluginHost = createPluginHost((err) => {
     error = `Plugin hook error: ${err instanceof Error ? err.message : String(err)}`;
   });
+  // Active plugin instances keyed by plugin id (not reactive — the registries
+  // the plugins feed are what the UI reads).
+  const pluginHandles = new Map<string, PluginHandle>();
+  // Transient message surfaced via the plugin API's `ui.notify`.
+  let pluginNotice = $state<string | null>(null);
 
   let adapter: VaultAdapter | null = null;
   let autosaver: Autosaver | null = null;
@@ -312,6 +326,7 @@
   }
 
   function teardownIo(): void {
+    void teardownPlugins();
     autosaver?.dispose();
     watcher?.dispose();
     themeWatcherDispose?.();
@@ -325,6 +340,112 @@
     vaultPath = null;
     conflict = null;
     lastSyncedMtime = 0;
+  }
+
+  // ── Plugin lifecycle ──────────────────────────────────────────────────────
+  // Build the activation context (`api`) for one plugin, bound to live state.
+  // Every registration / hook subscription is tracked so the loader can undo
+  // them on deactivate.
+  function buildPluginContext(
+    fp: FirstPartyPlugin,
+    currentAdapter: VaultAdapter,
+  ): { context: PluginContext; disposables: Disposable[] } {
+    const id = fp.manifest.id;
+    const disposables: Disposable[] = [];
+    const track = (d: Disposable): Disposable => {
+      disposables.push(d);
+      return d;
+    };
+    const context: PluginContext = {
+      manifest: fp.manifest,
+      appVersion: PLUGIN_API_VERSION,
+      commands: {
+        register: (cid, run, opts) => track(pluginHost.registerCommand(id, cid, run, opts)),
+      },
+      views: { register: (vid, comp, opts) => track(pluginHost.registerView(id, vid, comp, opts)) },
+      slots: {
+        register: (slot, comp, opts) => track(pluginHost.registerSlot(id, slot, comp, opts)),
+      },
+      taskActions: { register: (action) => track(pluginHost.registerTaskAction(id, action)) },
+      hooks: { on: (event, handler) => track(pluginHost.hooks.on(event, handler)) },
+      storage: createScopedStorage(currentAdapter, id),
+      tasks: {
+        find: (ref) => (loaded ? (findTask(loaded.vault, ref)?.task ?? null) : null),
+        mutate: (ref, mutator) => {
+          if (!loaded) return false;
+          const found = findTask(loaded.vault, ref);
+          if (!found) return false;
+          // Direct proxy mutation → the autosave $effect picks it up.
+          mutator(found.task);
+          return true;
+        },
+      },
+      ui: {
+        saveFile: async (name, contents, mime) => {
+          if (!platform.saveFile) {
+            throw new Error('Saving files is not supported in this environment.');
+          }
+          await platform.saveFile(name, contents, mime);
+        },
+        notify: (message) => {
+          pluginNotice = message;
+        },
+      },
+      settings: { get: () => resolvePluginSettings(fp.manifest.settings, settings.plugins[id]) },
+      log: {
+        info: (...args) => console.info(`[plugin:${id}]`, ...args),
+        warn: (...args) => console.warn(`[plugin:${id}]`, ...args),
+        error: (...args) => console.error(`[plugin:${id}]`, ...args),
+      },
+    };
+    return { context, disposables };
+  }
+
+  // Reconcile active plugins against the desired set (enabled + a vault open).
+  // Idempotent: safe to call on vault open, vault switch, and settings toggles.
+  async function syncPlugins(): Promise<void> {
+    const currentAdapter = adapter;
+    if (!loaded || !currentAdapter) {
+      await teardownPlugins();
+      return;
+    }
+    const desired = new Map<string, FirstPartyPlugin>();
+    for (const fp of FIRST_PARTY_PLUGINS) {
+      if (settings.plugins[fp.manifest.id]?.enabled !== false) desired.set(fp.manifest.id, fp);
+    }
+    // Deactivate plugins that are no longer wanted.
+    for (const [id, handle] of [...pluginHandles]) {
+      if (desired.has(id)) continue;
+      pluginHandles.delete(id);
+      try {
+        await handle.deactivate();
+      } catch (err) {
+        console.error(`[plugin:${id}] deactivate failed`, err);
+      }
+    }
+    // Activate newly wanted plugins (a disabled plugin's code is never imported).
+    for (const [id, fp] of desired) {
+      if (pluginHandles.has(id)) continue;
+      try {
+        const mod = await fp.load();
+        const { context, disposables } = buildPluginContext(fp, currentAdapter);
+        pluginHandles.set(id, await activatePlugin(mod, fp.manifest, context, disposables));
+      } catch (err) {
+        error = `Plugin "${id}" failed to load: ${err instanceof Error ? err.message : String(err)}`;
+      }
+    }
+  }
+
+  async function teardownPlugins(): Promise<void> {
+    const handles = [...pluginHandles.values()];
+    pluginHandles.clear();
+    for (const handle of handles) {
+      try {
+        await handle.deactivate();
+      } catch {
+        // A failed teardown of one plugin must not block the rest.
+      }
+    }
   }
 
   async function safeMtime(a: VaultAdapter, path: string): Promise<number> {
@@ -848,6 +969,15 @@
   $effect(() => {
     refreshRecents();
   });
+
+  // Reconcile plugins whenever a vault opens/closes or the per-plugin
+  // enable flags change. Reading `loaded` + `settings.plugins` registers the
+  // deps; `syncPlugins` is idempotent so re-runs are cheap.
+  $effect(() => {
+    void loaded;
+    void settings.plugins;
+    void syncPlugins();
+  });
 </script>
 
 <svelte:window onkeydown={handleGlobalKeydown} />
@@ -977,6 +1107,10 @@
 
     {#if error}
       <p class="error" role="alert">{error}</p>
+    {/if}
+
+    {#if pluginNotice}
+      <p class="plugin-notice" role="status" data-testid="plugin-notice">{pluginNotice}</p>
     {/if}
   </section>
 
@@ -1177,6 +1311,17 @@
     border-radius: 6px;
     background: rgba(192, 57, 43, 0.1);
     color: var(--priority-high);
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .plugin-notice {
+    margin: 8px auto 16px;
+    max-width: 480px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    background: var(--surface-2, rgba(0, 0, 0, 0.05));
+    color: var(--text-muted, inherit);
     font-size: 13px;
     text-align: center;
   }

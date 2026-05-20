@@ -17,6 +17,16 @@ export type GrammarProfile = (typeof GRAMMAR_PROFILES)[number];
 export const AUTOSAVE_DELAY_MIN = 100;
 export const AUTOSAVE_DELAY_MAX = 10_000;
 
+/**
+ * Per-plugin configuration: an `enabled` flag plus any schema-driven setting
+ * values (keyed by the plugin's settings-schema keys). Stored under the
+ * plugin id in `Settings.plugins`.
+ */
+export interface PluginSettingsEntry {
+  enabled: boolean;
+  [key: string]: unknown;
+}
+
 export interface Settings {
   theme: ThemeChoice;
   grammarProfile: GrammarProfile;
@@ -26,6 +36,8 @@ export interface Settings {
   projectColorOverrides: Record<string, string>;
   /** Keyboard-shortcut overrides, keyed by command id → combo (empty unbinds). */
   shortcuts: Record<string, string>;
+  /** Per-plugin enable flag + setting values, keyed by plugin id. */
+  plugins: Record<string, PluginSettingsEntry>;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -34,6 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autosaveDelayMs: 500,
   projectColorOverrides: {},
   shortcuts: {},
+  plugins: {},
 };
 
 export const STORAGE_KEY = 'markdown-board:settings';
@@ -50,6 +63,7 @@ export function loadSettings(): Settings {
       autosaveDelayMs: parseAutosaveDelay(parsed.autosaveDelayMs),
       projectColorOverrides: parseProjectColorOverrides(parsed.projectColorOverrides),
       shortcuts: parseShortcuts(parsed.shortcuts),
+      plugins: parsePlugins(parsed.plugins),
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -136,6 +150,19 @@ function parseShortcuts(value: unknown): Record<string, string> {
   for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
     // Empty string is meaningful here: it unbinds a default shortcut.
     if (typeof raw === 'string') out[key] = raw;
+  }
+  return out;
+}
+
+function parsePlugins(value: unknown): Record<string, PluginSettingsEntry> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const out: Record<string, PluginSettingsEntry> = {};
+  for (const [id, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) continue;
+    const entry = raw as Record<string, unknown>;
+    // Default to enabled when the flag is absent (first-party plugins are on
+    // by default); only an explicit `false` disables.
+    out[id] = { ...entry, enabled: entry.enabled !== false };
   }
   return out;
 }

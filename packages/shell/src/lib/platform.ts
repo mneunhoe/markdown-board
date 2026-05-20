@@ -94,4 +94,9 @@ export interface VaultPlatform {
   openRecentVault?(path: string): Promise<VaultAdapter | null>;
   /** Optional: open a second app window (desktop multi-window). */
   openNewWindow?(): Promise<void>;
+  /**
+   * Optional: save text to a user-chosen location. Web downloads via a Blob;
+   * desktop opens a native save dialog. Backs the plugin API's `ui.saveFile`.
+   */
+  saveFile?(name: string, contents: string, mime?: string): Promise<void>;
 }
