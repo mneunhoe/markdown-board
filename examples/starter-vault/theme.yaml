@@ -1,0 +1,47 @@
+# ADA brand theme for markdown-board.
+#
+# Palette and typeface from the ADA brand manual (Angewandte Datenanalyse
+# für die öffentliche Verwaltung). Coral Red is the brand's primary
+# hierarchy colour, so it drives the accent; the warm off-white and brand
+# black anchor the surfaces and text. Funnel Sans is the corporate typeface
+# (open-source, OFL — bundled as a variable woff2 under theme/fonts/).
+name: ADA
+
+# Header title beside the logo. Set to "" to hide it; omit to keep "markdown-board".
+title: ADA Board
+
+colors:
+  accent: '#ff7550' # Coral Red
+  accentHover: '#e85f3c'
+  background: '#fffbf3' # Off-White
+  surface: '#f6efe1'
+  card: '#ffffff'
+  text: '#1c1c1c' # Brand Black
+  textSecondary: '#707070' # Brand Grey
+  textMuted: '#a8a094'
+  border: '#ece3d3'
+  borderLight: '#f3ecdf'
+
+dark:
+  colors:
+    background: '#1c1c1c' # Brand Black
+    surface: '#262624'
+    card: '#2e2e2b'
+    text: '#fffbf3' # Off-White
+    textSecondary: '#b8b3a8'
+    textMuted: '#827f79'
+    accent: '#ff8a6b' # lifted Coral for contrast on dark
+    accentHover: '#ff7550'
+    border: '#3a3a36'
+    borderLight: '#2e2e2b'
+
+fonts:
+  body: "'Funnel Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+  files:
+    - family: 'Funnel Sans'
+      src: theme/fonts/FunnelSans.woff2
+      weight: '300 700' # variable weight axis (Light–Bold)
+
+# Self-contained ADA avatar badge: its own dark disc keeps the mark legible
+# on both the off-white light theme and the dark theme.
+logo: theme/ada-avatar.svg

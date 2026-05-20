@@ -1,0 +1,11 @@
+{
+  "state": {
+    "phase": "idle",
+    "endTime": null,
+    "pausedRemainingMs": null,
+    "focusCount": 0,
+    "currentTaskId": null,
+    "currentTaskSectionId": null,
+    "currentTaskTitle": null
+  }
+}
