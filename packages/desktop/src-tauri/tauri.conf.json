@@ -27,11 +27,19 @@
     }
   },
   "bundle": {
-    "active": false,
+    "active": true,
     "targets": "all",
     "category": "Productivity",
+    "publisher": "markdown-board",
+    "copyright": "Copyright © 2026 markdown-board contributors",
     "shortDescription": "Kanban-first knowledge workspace on plain Markdown files you own.",
     "longDescription": "markdown-board is a local-first task board and notes workspace that reads and writes plain Markdown files in a folder you own. The desktop build wraps the @markdown-board/ui front-end with a TauriFileAdapter and a native file watcher.",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.png"]
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
   }
 }
