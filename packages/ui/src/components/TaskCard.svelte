@@ -1,11 +1,19 @@
 <script lang="ts">
+  import { getContext } from 'svelte';
   import type { Task } from '@markdown-board/core';
   import PriorityBadge from './PriorityBadge.svelte';
   import DayChip from './DayChip.svelte';
   import ProjectPill from './ProjectPill.svelte';
+  import { TASK_ACTIONS_KEY, type TaskActionsAccessor } from '../lib/task-actions.js';
 
   interface Props {
     task: Task;
+    /**
+     * Section this card lives in. Required for plugin task actions (their
+     * `run` needs a `{ taskId, sectionId }` ref). Omitted ⇒ no action buttons
+     * (e.g. archived cards).
+     */
+    sectionId?: string;
     /**
      * When provided, the checkbox becomes interactive — clicking it calls
      * back so the host shell can open a resolve flow (write to
@@ -46,6 +54,7 @@
 
   const {
     task,
+    sectionId,
     onResolve,
     onTitleEdit,
     onNoteEdit,
@@ -59,6 +68,11 @@
     onFullEdit,
     onUnresolve,
   }: Props = $props();
+
+  // Plugin-contributed task actions (e.g. pomodoro's start). Available only
+  // when the host published the accessor and we know our section.
+  const taskActionsAccessor = getContext<TaskActionsAccessor | undefined>(TASK_ACTIONS_KEY);
+  const taskActions = $derived(sectionId && taskActionsAccessor ? taskActionsAccessor() : []);
 
   const checkboxInteractive = $derived(onResolve !== undefined);
   const titleEditable = $derived(onTitleEdit !== undefined);
@@ -162,6 +176,17 @@
         onclick={() => onUnresolve?.()}>↺</button
       >
     {/if}
+    {#each taskActions as action (action.key)}
+      <button
+        type="button"
+        class="task-action-btn"
+        aria-label={action.label}
+        title={action.label}
+        data-task-action={action.key}
+        onclick={() => action.run({ taskId: task.id, sectionId: sectionId! })}
+        >{action.icon ?? action.label}</button
+      >
+    {/each}
     <input
       type="checkbox"
       class="card-checkbox"
@@ -390,6 +415,33 @@
   }
 
   .full-edit-btn:hover {
+    color: var(--accent);
+  }
+
+  .task-action-btn {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0;
+    min-width: 16px;
+    height: 16px;
+    line-height: 1;
+    font-size: 13px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition:
+      opacity 0.1s ease,
+      color 0.1s ease;
+  }
+
+  .task-card:hover .task-action-btn,
+  .task-action-btn:focus-visible {
+    opacity: 1;
+  }
+
+  .task-action-btn:hover {
     color: var(--accent);
   }
 

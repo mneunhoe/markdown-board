@@ -27,7 +27,7 @@
   } from '@markdown-board/ui';
   import TabBar from './TabBar.svelte';
   import { TABS, type TabDescriptor, type TabKey } from '../lib/tabs.js';
-  import type { RegisteredView } from '../lib/plugins/registry.svelte.js';
+  import type { RegisteredSlot, RegisteredView } from '../lib/plugins/registry.svelte.js';
   import { setViewContext } from '../lib/plugins/view-context.js';
 
   interface Props {
@@ -69,6 +69,8 @@
     onActiveChange?: (key: TabKey) => void;
     /** Plugin-contributed views, appended as tabs after the built-ins. */
     pluginViews?: readonly RegisteredView[];
+    /** Plugin-contributed components for the view-toolbar slot. */
+    toolbarSlots?: readonly RegisteredSlot[];
   }
 
   const {
@@ -97,6 +99,7 @@
     active: activeProp,
     onActiveChange,
     pluginViews = [],
+    toolbarSlots = [],
   }: Props = $props();
 
   // Controlled when `activeProp` is supplied (VaultApp drives it via the
@@ -195,6 +198,15 @@
 <div class="workspace">
   <TabBar {active} {tabs} onSelect={selectTab} />
 
+  {#if toolbarSlots.length > 0}
+    <div class="view-toolbar" data-testid="view-toolbar">
+      {#each toolbarSlots as slot (slot.pluginId + ':' + slot.seq)}
+        {@const ToolbarSlot = slot.component}
+        <ToolbarSlot />
+      {/each}
+    </div>
+  {/if}
+
   <div class="view" role="tabpanel" data-active={active}>
     {#if active === 'board'}
       <BoardView {vault} {...boardMoveProps} />
@@ -217,6 +229,15 @@
     flex-direction: column;
     flex: 1;
     min-height: 0;
+  }
+
+  .view-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
   }
 
   .view {

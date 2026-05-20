@@ -5,6 +5,7 @@
   import {
     EmptyState,
     PROJECT_COLOR_OVERRIDES_KEY,
+    TASK_ACTIONS_KEY,
     projectShort,
     type ArchivedTaskRef,
     type ColumnMoveHandler,
@@ -688,6 +689,9 @@
   // Make project-colour overrides reactively available to ProjectPill.
   setContext(PROJECT_COLOR_OVERRIDES_KEY, () => settings.projectColorOverrides);
 
+  // Expose plugin-contributed task actions to TaskCard (read reactively).
+  setContext(TASK_ACTIONS_KEY, () => pluginHost.taskActions);
+
   // Slice 6g-3 — group archive entries by source-section name and map
   // to the matching active section's id. Orphans (source section
   // missing from the active vault) fall back to the first section so
@@ -1032,6 +1036,10 @@
           New window
         </button>
       {/if}
+      {#each pluginHost.slotsFor('header') as slot (slot.pluginId + ':' + slot.seq)}
+        {@const HeaderSlot = slot.component}
+        <HeaderSlot />
+      {/each}
       <button
         type="button"
         class="topbar-action"
@@ -1070,6 +1078,7 @@
         {onSectionAdd}
         {onSectionDelete}
         pluginViews={pluginHost.views}
+        toolbarSlots={pluginHost.slotsFor('view-toolbar')}
         active={activeTab}
         onActiveChange={(k) => (activeTab = k)}
       />

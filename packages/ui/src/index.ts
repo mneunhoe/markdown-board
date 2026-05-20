@@ -19,6 +19,12 @@ export {
   PROJECT_COLOR_OVERRIDES_KEY,
 } from './lib/project.js';
 export {
+  TASK_ACTIONS_KEY,
+  type TaskActionEntry,
+  type TaskActionRef,
+  type TaskActionsAccessor,
+} from './lib/task-actions.js';
+export {
   type ColumnDragData,
   type ColumnMoveHandler,
   type Edge,

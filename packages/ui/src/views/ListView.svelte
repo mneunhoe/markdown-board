@@ -240,6 +240,7 @@
             >
               <TaskCard
                 {task}
+                sectionId={section.id}
                 {...onResolve
                   ? { onResolve: () => onResolve({ taskId: task.id, sectionId: section.id }) }
                   : {}}

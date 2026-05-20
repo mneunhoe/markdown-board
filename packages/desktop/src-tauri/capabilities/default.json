@@ -8,6 +8,7 @@
     "core:webview:allow-create-webview-window",
     "dialog:default",
     "dialog:allow-open",
+    "dialog:allow-save",
     "dialog:allow-ask",
     "dialog:allow-message",
     "updater:default",

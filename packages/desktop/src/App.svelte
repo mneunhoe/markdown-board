@@ -1,8 +1,8 @@
 <script lang="ts">
   import { VaultApp, type VaultPlatform } from '@markdown-board/shell';
   import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-  import { open } from '@tauri-apps/plugin-dialog';
-  import { stat } from '@tauri-apps/plugin-fs';
+  import { open, save } from '@tauri-apps/plugin-dialog';
+  import { stat, writeTextFile } from '@tauri-apps/plugin-fs';
   import { TauriFileAdapter } from './lib/adapters/index.js';
   import { subscribeFolderDrop } from './lib/dnd.js';
   import { loadRecents, recordRecent, removeRecent } from './lib/recents.js';
@@ -50,6 +50,11 @@
       // Resolve once the window-create request is registered; the new window
       // boots the app fresh with its own shell/adapter/watcher.
       await win.once('tauri://created', () => undefined);
+    },
+    async saveFile(name, contents) {
+      const path = await save({ defaultPath: name });
+      if (!path) return; // user cancelled the dialog
+      await writeTextFile(path, contents);
     },
   };
 </script>

@@ -24,6 +24,19 @@
       }
     },
     createWatcher: (_adapter, deps) => new ExternalChangeWatcher(deps),
+    saveFile(name, contents, mime = 'text/plain') {
+      const blob = new Blob([contents], { type: `${mime};charset=utf-8` });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Revoke after a tick so the download has a chance to start.
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return Promise.resolve();
+    },
   };
 </script>
 

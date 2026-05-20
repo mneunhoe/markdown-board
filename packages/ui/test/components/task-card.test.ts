@@ -1,6 +1,8 @@
 import { fireEvent, render } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 import TaskCard from '../../src/components/TaskCard.svelte';
+import TaskCardActionsHost from '../fixtures/TaskCardActionsHost.svelte';
+import type { TaskActionEntry } from '../../src/lib/task-actions.js';
 import type { Task } from '@markdown-board/core';
 
 function makeTask(overrides: Partial<Task> = {}): Task {
@@ -347,6 +349,59 @@ describe('TaskCard', () => {
       // Checkbox stays presentation-only (no onResolve).
       const checkbox = container.querySelector<HTMLInputElement>('.card-checkbox');
       expect(checkbox?.classList.contains('interactive')).toBe(false);
+    });
+  });
+
+  describe('plugin task actions (slice S5)', () => {
+    const action = (over: Partial<TaskActionEntry> = {}): TaskActionEntry => ({
+      key: 'pomodoro:start',
+      label: 'Start pomodoro',
+      icon: '▶',
+      run: vi.fn(),
+      ...over,
+    });
+
+    it('renders a button per registered action when a sectionId is provided', () => {
+      const { container } = render(TaskCardActionsHost, {
+        task: makeTask(),
+        sectionId: 'active',
+        actions: [action()],
+      });
+      const btn = container.querySelector<HTMLButtonElement>('[data-task-action="pomodoro:start"]');
+      expect(btn).toBeTruthy();
+      expect(btn!.textContent?.trim()).toBe('▶');
+      expect(btn!.getAttribute('aria-label')).toBe('Start pomodoro');
+    });
+
+    it('falls back to the label when no icon is given', () => {
+      const noIcon: TaskActionEntry = { key: 'pomodoro:start', label: 'Do it', run: vi.fn() };
+      const { container } = render(TaskCardActionsHost, {
+        task: makeTask(),
+        sectionId: 'active',
+        actions: [noIcon],
+      });
+      expect(
+        container.querySelector('[data-task-action="pomodoro:start"]')?.textContent?.trim(),
+      ).toBe('Do it');
+    });
+
+    it('invokes run with the task + section ref on click', async () => {
+      const run = vi.fn();
+      const { container } = render(TaskCardActionsHost, {
+        task: makeTask({ id: 'task-1' }),
+        sectionId: 'active',
+        actions: [action({ run })],
+      });
+      await fireEvent.click(container.querySelector('[data-task-action="pomodoro:start"]')!);
+      expect(run).toHaveBeenCalledWith({ taskId: 'task-1', sectionId: 'active' });
+    });
+
+    it('renders no action buttons without a sectionId (e.g. archived cards)', () => {
+      const { container } = render(TaskCardActionsHost, {
+        task: makeTask(),
+        actions: [action()],
+      });
+      expect(container.querySelector('[data-task-action]')).toBeNull();
     });
   });
 });
