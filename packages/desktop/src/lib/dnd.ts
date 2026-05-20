@@ -42,8 +42,9 @@ const defaultDeps: FolderDropDeps = {
  */
 export function subscribeFolderDrop(
   handler: ExternalOpenHandler,
-  deps: FolderDropDeps = defaultDeps,
+  overrides: Partial<FolderDropDeps> = {},
 ): () => void {
+  const deps: FolderDropDeps = { ...defaultDeps, ...overrides };
   let unlisten: (() => void) | null = null;
   let disposed = false;
 

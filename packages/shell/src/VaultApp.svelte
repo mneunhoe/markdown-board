@@ -34,6 +34,7 @@
   import { applyTheme, loadSettings, saveSettings, type Settings } from './lib/settings.js';
   import type {
     ExternalOpenEvent,
+    RecentVault,
     VaultAdapter,
     VaultPlatform,
     VaultWatcher,
@@ -76,6 +77,10 @@
   let error = $state<string | null>(null);
   // True while a folder is being dragged over the window (desktop DnD).
   let dragActive = $state(false);
+  // Recently opened vaults offered on the empty state (desktop only).
+  // Seeded from the platform in an effect (below) to keep the prop read
+  // inside a reactive context.
+  let recents = $state<RecentVault[]>([]);
   let lastWrittenMd = $state<string>('');
   /** Captured at modal-open time so a concurrent external reload can't shift the target. */
   let resolveTarget = $state<{ task: Task; section: Section } | null>(null);
@@ -141,6 +146,37 @@
     }
   }
 
+  function refreshRecents(): void {
+    recents = platform.listRecentVaults?.() ?? [];
+  }
+
+  async function openRecentByPath(path: string): Promise<void> {
+    if (loading) return;
+    error = null;
+    loading = true;
+    try {
+      const next = await platform.openRecentVault?.(path);
+      if (!next) {
+        error = 'That vault is no longer available — it may have been moved or deleted.';
+        refreshRecents();
+        return;
+      }
+      await mountVault(next);
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function openNewWindow(): Promise<void> {
+    try {
+      await platform.openNewWindow?.();
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    }
+  }
+
   async function mountVault(next: VaultAdapter): Promise<void> {
     teardownIo();
     adapter = next;
@@ -177,6 +213,9 @@
       },
     });
     await watcher.start();
+    // The just-opened vault is now the most-recent; reflect that so the
+    // empty state shows it first next time the user opens another vault.
+    refreshRecents();
   }
 
   function teardownIo(): void {
@@ -507,6 +546,11 @@
     const unsubscribe = platform.subscribeExternalOpen?.(handleExternalOpen);
     return () => unsubscribe?.();
   });
+
+  // Seed the recent-vaults list once the platform is available.
+  $effect(() => {
+    refreshRecents();
+  });
 </script>
 
 <main class="shell">
@@ -522,6 +566,16 @@
           data-testid="reopen-vault"
         >
           {loading ? 'Loading…' : 'Open another vault…'}
+        </button>
+      {/if}
+      {#if platform.openNewWindow}
+        <button
+          type="button"
+          class="topbar-action"
+          onclick={openNewWindow}
+          data-testid="new-window"
+        >
+          New window
         </button>
       {/if}
       <button
@@ -581,6 +635,27 @@
         >
           {loading ? 'Loading…' : 'Pick a vault folder'}
         </button>
+        {#if recents.length}
+          <div class="recents" data-testid="recent-vaults">
+            <p class="recents-label">Recent vaults</p>
+            <ul class="recents-list">
+              {#each recents as recent (recent.path)}
+                <li>
+                  <button
+                    type="button"
+                    class="recent"
+                    onclick={() => openRecentByPath(recent.path)}
+                    disabled={loading}
+                    title={recent.path}
+                  >
+                    <span class="recent-name">{recent.name}</span>
+                    <span class="recent-path">{recent.path}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
       </EmptyState>
     {/if}
 
@@ -735,6 +810,68 @@
     color: var(--priority-high);
     font-size: 13px;
     text-align: center;
+  }
+
+  .recents {
+    margin-top: 28px;
+    width: 100%;
+    max-width: 420px;
+    text-align: left;
+  }
+
+  .recents-label {
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+
+  .recents-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .recent {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    width: 100%;
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    border-radius: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .recent:hover:not(:disabled) {
+    border-color: var(--accent);
+  }
+
+  .recent:disabled {
+    opacity: 0.6;
+    cursor: progress;
+  }
+
+  .recent-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .recent-path {
+    font-size: 11px;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .drop-overlay {

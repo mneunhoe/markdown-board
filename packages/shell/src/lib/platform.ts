@@ -52,6 +52,14 @@ export type ExternalOpenEvent =
 
 export type ExternalOpenHandler = (event: ExternalOpenEvent) => void | Promise<void>;
 
+/** A previously opened vault the shell can offer for one-click reopen. */
+export interface RecentVault {
+  /** Absolute path used to reopen (opaque to the shell). */
+  path: string;
+  /** Display label (typically the folder basename). */
+  name: string;
+}
+
 export interface VaultPlatform {
   /**
    * Pick a vault folder and build an adapter for it. Resolves to `null`
@@ -70,4 +78,13 @@ export interface VaultPlatform {
    * recent-vaults menu). Returns an unsubscribe fn. Unimplemented on web.
    */
   subscribeExternalOpen?(handler: ExternalOpenHandler): () => void;
+  /** Optional: recently opened vaults to offer on the empty state. */
+  listRecentVaults?(): RecentVault[];
+  /**
+   * Optional: reopen a recent vault by path. Resolves to `null` if the vault
+   * is gone (the platform should prune it from the recents list).
+   */
+  openRecentVault?(path: string): Promise<VaultAdapter | null>;
+  /** Optional: open a second app window (desktop multi-window). */
+  openNewWindow?(): Promise<void>;
 }

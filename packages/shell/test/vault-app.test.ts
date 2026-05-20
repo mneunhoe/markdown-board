@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import VaultApp from '../src/VaultApp.svelte';
 import type {
   ExternalOpenHandler,
+  RecentVault,
   VaultAdapter,
   VaultPlatform,
   VaultWatcher,
@@ -150,6 +151,69 @@ describe('VaultApp (shell, injected platform)', () => {
       await emit({ kind: 'error', message: 'Drop a folder, not a file, to open it as a vault.' });
       expect(container.querySelector('[data-testid="drop-overlay"]')).toBeNull();
       expect(container.querySelector('[role=alert]')?.textContent).toContain('Drop a folder');
+    });
+  });
+
+  describe('recent vaults', () => {
+    it('does not render the recents list when the platform offers none', () => {
+      const { container } = render(VaultApp, { props: { platform: makeFakePlatform(null) } });
+      expect(container.querySelector('[data-testid="recent-vaults"]')).toBeNull();
+    });
+
+    it('renders recent vaults and reopens one on click', async () => {
+      const adapter = new TestVaultAdapter({ 'TASKS.md': '## Active\n- [ ] From recents\n' });
+      const platform = makeFakePlatform(null, {
+        listRecentVaults: () => [{ path: '/Users/me/alpha', name: 'alpha' }],
+        openRecentVault: (path) => Promise.resolve(path === '/Users/me/alpha' ? adapter : null),
+      });
+      const { container } = render(VaultApp, { props: { platform } });
+      const list = container.querySelector('[data-testid="recent-vaults"]');
+      expect(list?.textContent).toContain('alpha');
+      expect(list?.textContent).toContain('/Users/me/alpha');
+      await fireEvent.click(container.querySelector<HTMLButtonElement>('.recent')!);
+      await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+      expect(container.textContent).toContain('From recents');
+    });
+
+    it('errors and prunes when a recent vault is gone', async () => {
+      let recents: RecentVault[] = [{ path: '/Users/me/gone', name: 'gone' }];
+      const platform = makeFakePlatform(null, {
+        listRecentVaults: () => recents,
+        openRecentVault: (path) => {
+          recents = recents.filter((r) => r.path !== path);
+          return Promise.resolve(null);
+        },
+      });
+      const { container } = render(VaultApp, { props: { platform } });
+      await fireEvent.click(container.querySelector<HTMLButtonElement>('.recent')!);
+      await waitFor(() =>
+        expect(container.querySelector('[role=alert]')?.textContent).toContain(
+          'no longer available',
+        ),
+      );
+      expect(container.querySelector('[data-testid="recent-vaults"]')).toBeNull();
+    });
+  });
+
+  describe('multi-window', () => {
+    it('hides the New window action when the platform cannot open windows', () => {
+      const { container } = render(VaultApp, { props: { platform: makeFakePlatform(null) } });
+      expect(container.querySelector('[data-testid="new-window"]')).toBeNull();
+    });
+
+    it('invokes openNewWindow when the action is clicked', async () => {
+      let opened = 0;
+      const platform = makeFakePlatform(null, {
+        openNewWindow: () => {
+          opened += 1;
+          return Promise.resolve();
+        },
+      });
+      const { container } = render(VaultApp, { props: { platform } });
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="new-window"]')!,
+      );
+      expect(opened).toBe(1);
     });
   });
 });

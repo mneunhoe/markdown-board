@@ -2,6 +2,7 @@ export { default as VaultApp } from './VaultApp.svelte';
 export type {
   ExternalOpenEvent,
   ExternalOpenHandler,
+  RecentVault,
   VaultAdapter,
   VaultPlatform,
   VaultWatcher,

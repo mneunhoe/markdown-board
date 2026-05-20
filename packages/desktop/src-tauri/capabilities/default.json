@@ -2,9 +2,10 @@
   "$schema": "https://schema.tauri.app/config/2",
   "identifier": "default",
   "description": "Capabilities granted to the main markdown-board window: the fs plugin for the TauriFileAdapter, watch/unwatch for the native external-change watcher, and the dialog plugin for the open-vault folder picker. The fs scope is broadened to the user's home tree so a picked vault is readable; tightening this to the picked root at runtime is a follow-up.",
-  "windows": ["main"],
+  "windows": ["main", "vault-*"],
   "permissions": [
     "core:default",
+    "core:webview:allow-create-webview-window",
     "dialog:default",
     "dialog:allow-open",
     "fs:default",
