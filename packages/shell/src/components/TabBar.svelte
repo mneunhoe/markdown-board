@@ -1,16 +1,19 @@
 <script lang="ts">
-  import { TABS, type TabKey } from '../lib/tabs.js';
+  import { TABS, type TabDescriptor, type TabKey } from '../lib/tabs.js';
 
   interface Props {
     active: TabKey;
     onSelect: (key: TabKey) => void;
+    /** Tabs to render. Defaults to the built-in views; the workspace passes the
+     * built-ins + plugin-contributed views. */
+    tabs?: readonly TabDescriptor[];
   }
 
-  const { active, onSelect }: Props = $props();
+  const { active, onSelect, tabs = TABS }: Props = $props();
 </script>
 
 <div class="tab-bar" role="tablist" aria-label="Vault views">
-  {#each TABS as tab (tab.key)}
+  {#each tabs as tab (tab.key)}
     <button
       type="button"
       role="tab"

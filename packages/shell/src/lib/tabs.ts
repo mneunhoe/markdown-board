@@ -1,9 +1,13 @@
 // Tab keys + ordered descriptor list shared between the TabBar atom and
-// the VaultWorkspace composer. Single source of truth so the rendered
-// order matches the type union.
+// the VaultWorkspace composer. Built-in views have fixed keys; plugin views
+// contribute additional descriptors at runtime, so `TabKey` is a plain string
+// (a namespaced `<plugin>:<id>` for plugin views).
 
-export const TAB_KEYS = ['board', 'list', 'library', 'overview'] as const;
-export type TabKey = (typeof TAB_KEYS)[number];
+export const BUILTIN_TAB_KEYS = ['board', 'list', 'library', 'overview'] as const;
+export type BuiltinTabKey = (typeof BUILTIN_TAB_KEYS)[number];
+
+/** A tab key — a built-in key or a plugin-contributed `<plugin>:<id>` key. */
+export type TabKey = string;
 
 export interface TabDescriptor {
   key: TabKey;

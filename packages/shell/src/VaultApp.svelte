@@ -888,6 +888,16 @@
       },
       enabled: Boolean(loaded),
     })),
+    // A go-to command per plugin view, so the palette can switch to it.
+    ...pluginHost.views.map((view) => ({
+      id: `go-${view.key}`,
+      title: `Go to ${view.title}`,
+      group: 'Navigate',
+      run: () => {
+        activeTab = view.key;
+      },
+      enabled: Boolean(loaded),
+    })),
     // Plugin-contributed commands (namespaced + bound by the host). Disabled
     // wholesale until a vault is open so they don't fire without context.
     ...pluginHost.commands.map((c) => ({ ...c, enabled: c.enabled !== false && Boolean(loaded) })),
@@ -1059,6 +1069,7 @@
         {onTaskAdd}
         {onSectionAdd}
         {onSectionDelete}
+        pluginViews={pluginHost.views}
         active={activeTab}
         onActiveChange={(k) => (activeTab = k)}
       />

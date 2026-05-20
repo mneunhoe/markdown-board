@@ -26,7 +26,9 @@
     type TitleEditHandler,
   } from '@markdown-board/ui';
   import TabBar from './TabBar.svelte';
-  import type { TabKey } from '../lib/tabs.js';
+  import { TABS, type TabDescriptor, type TabKey } from '../lib/tabs.js';
+  import type { RegisteredView } from '../lib/plugins/registry.svelte.js';
+  import { setViewContext } from '../lib/plugins/view-context.js';
 
   interface Props {
     vault: Vault;
@@ -65,6 +67,8 @@
     active?: TabKey;
     /** Fired on tab change when controlled. */
     onActiveChange?: (key: TabKey) => void;
+    /** Plugin-contributed views, appended as tabs after the built-ins. */
+    pluginViews?: readonly RegisteredView[];
   }
 
   const {
@@ -92,6 +96,7 @@
     onSectionDelete,
     active: activeProp,
     onActiveChange,
+    pluginViews = [],
   }: Props = $props();
 
   // Controlled when `activeProp` is supplied (VaultApp drives it via the
@@ -103,6 +108,43 @@
     if (onActiveChange) onActiveChange(key);
     else internalActive = key;
   }
+
+  // Built-in tabs + a tab per plugin view.
+  const tabs = $derived<TabDescriptor[]>([
+    ...TABS,
+    ...pluginViews.map((v) => ({ key: v.key, label: v.title })),
+  ]);
+  const activePluginView = $derived(pluginViews.find((v) => v.key === active) ?? null);
+
+  // The handler bag exposed to plugin views, recomputed reactively so prop
+  // changes propagate (and reads stay inside a reactive scope).
+  const viewHandlers = $derived({
+    ...(onTaskMove ? { onTaskMove } : {}),
+    ...(onColumnMove ? { onColumnMove } : {}),
+    ...(onResolve ? { onResolve } : {}),
+    ...(onTitleEdit ? { onTitleEdit } : {}),
+    ...(onNoteEdit ? { onNoteEdit } : {}),
+    ...(onSubtaskEdit ? { onSubtaskEdit } : {}),
+    ...(onSubtaskAdd ? { onSubtaskAdd } : {}),
+    ...(onSubtaskToggle ? { onSubtaskToggle } : {}),
+    ...(onTaskDelete ? { onTaskDelete } : {}),
+    ...(onPriorityCycle ? { onPriorityCycle } : {}),
+    ...(onProjectEdit ? { onProjectEdit } : {}),
+    ...(onDayEdit ? { onDayEdit } : {}),
+    ...(onSectionRename ? { onSectionRename } : {}),
+    ...(onFullTaskEdit ? { onFullTaskEdit } : {}),
+    ...(onTaskAdd ? { onTaskAdd } : {}),
+    ...(onSectionAdd ? { onSectionAdd } : {}),
+    ...(onSectionDelete ? { onSectionDelete } : {}),
+  });
+
+  // Publish the view context so plugin views can read the live vault + the
+  // host's mutation/edit handlers. Getters keep reads reactive.
+  setViewContext({
+    getVault: () => vault,
+    getLibraryDocs: () => libraryDocs,
+    getHandlers: () => viewHandlers,
+  });
 
   // Conditionally-keyed prop bags so an undefined handler is *absent*
   // rather than passed as `undefined` — required under
@@ -151,7 +193,7 @@
 </script>
 
 <div class="workspace">
-  <TabBar {active} onSelect={selectTab} />
+  <TabBar {active} {tabs} onSelect={selectTab} />
 
   <div class="view" role="tabpanel" data-active={active}>
     {#if active === 'board'}
@@ -162,6 +204,9 @@
       <LibraryView docs={libraryDocs} {...onLibraryEdit ? { onEdit: onLibraryEdit } : {}} />
     {:else if active === 'overview'}
       <OverviewView {vault} {libraryDocs} />
+    {:else if activePluginView}
+      {@const PluginView = activePluginView.component}
+      <PluginView />
     {/if}
   </div>
 </div>

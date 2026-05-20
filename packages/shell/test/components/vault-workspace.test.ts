@@ -2,7 +2,11 @@ import type { LibraryDoc, Vault } from '@markdown-board/core';
 import { fireEvent, render } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 
+import type { PluginComponent } from '@markdown-board/plugin-api';
+
 import VaultWorkspace from '../../src/components/VaultWorkspace.svelte';
+import type { RegisteredView } from '../../src/lib/plugins/registry.svelte.js';
+import PluginViewProbe from '../fixtures/PluginViewProbe.svelte';
 
 function makeVault(): Vault {
   return {
@@ -91,5 +95,37 @@ describe('VaultWorkspace', () => {
       libraryDocs: [],
     });
     expect(container.querySelector('.empty-state')).toBeTruthy();
+  });
+
+  const pluginViews: RegisteredView[] = [
+    {
+      key: 'demo:week',
+      title: 'Week',
+      component: PluginViewProbe as unknown as PluginComponent,
+      pluginId: 'demo',
+    },
+  ];
+
+  it('appends a tab for a plugin-contributed view', () => {
+    const { container } = render(VaultWorkspace, {
+      vault: makeVault(),
+      libraryDocs: makeDocs(),
+      pluginViews,
+    });
+    const tab = container.querySelector<HTMLButtonElement>('[data-tab="demo:week"]');
+    expect(tab).toBeTruthy();
+    expect(tab!.textContent?.trim()).toBe('Week');
+  });
+
+  it('renders the plugin view with a working view context when its tab is active', async () => {
+    const { container, getByTestId } = render(VaultWorkspace, {
+      vault: makeVault(),
+      libraryDocs: makeDocs(),
+      pluginViews,
+    });
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('[data-tab="demo:week"]')!);
+    expect(container.querySelector('[data-active="demo:week"]')).toBeTruthy();
+    // The probe reads the vault from the view context.
+    expect(getByTestId('plugin-view-probe').textContent).toContain('Write tests');
   });
 });
