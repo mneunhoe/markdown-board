@@ -10,7 +10,12 @@ export type {
 } from './lib/platform.js';
 export { ExternalChangeWatcher, type ExternalChangeWatcherOptions } from './lib/vault/index.js';
 export { applyTheme, loadSettings, saveSettings, type Settings } from './lib/settings.js';
-export { getViewContext, type ViewContext, type ViewHandlers } from './lib/plugins/view-context.js';
+export {
+  getViewContext,
+  setViewContext,
+  type ViewContext,
+  type ViewHandlers,
+} from './lib/plugins/view-context.js';
 export {
   parseTheme,
   compileTheme,

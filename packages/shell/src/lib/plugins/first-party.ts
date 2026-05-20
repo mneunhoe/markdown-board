@@ -53,4 +53,15 @@ export const FIRST_PARTY_PLUGINS: readonly FirstPartyPlugin[] = [
     },
     load: () => import('@markdown-board/plugin-pomodoro'),
   },
+  {
+    manifest: {
+      id: 'week-view',
+      name: 'Week view',
+      version: '1.0.0',
+      entry: '',
+      minAppVersion: '1.0.0',
+      description: 'A seven-column board grouped by day of week, with drag-to-reschedule.',
+    },
+    load: () => import('@markdown-board/plugin-week-view'),
+  },
 ];
