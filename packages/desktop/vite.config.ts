@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
 
@@ -28,5 +29,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     target: ['es2022', 'chrome105', 'safari15'],
+  },
+  test: {
+    environment: 'happy-dom',
+    include: ['test/**/*.test.ts'],
   },
 });
