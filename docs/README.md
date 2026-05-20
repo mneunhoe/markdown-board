@@ -12,5 +12,6 @@ Index of project documentation. Content lands per phase — see the root
 | `theming.md`            | 3                      | Written |
 | `keyboard-shortcuts.md` | 3                      | Written |
 | `sync-recipes.md`       | 3                      | Written |
-| `plugin-api.md`         | 4                      | Planned |
+| `plugin-api.md`         | 4                      | Written |
+| `plugins.md`            | 4                      | Written |
 | `contributing.md`       | When the repo opens up | Planned |

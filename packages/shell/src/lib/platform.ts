@@ -7,6 +7,17 @@
 // shell only ever sees this contract.
 
 import type { FileAdapter } from '@markdown-board/core';
+import type { PluginManifest, PluginModule } from '@markdown-board/plugin-api';
+
+/**
+ * A plugin the host can activate: its manifest (for gating + Settings) plus a
+ * lazy loader for the module. First-party plugins and platform-discovered
+ * third-party plugins share this shape.
+ */
+export interface LoadablePlugin {
+  manifest: PluginManifest;
+  load: () => Promise<PluginModule>;
+}
 
 /**
  * The adapter the shell needs: the core `FileAdapter` contract plus the
@@ -99,4 +110,10 @@ export interface VaultPlatform {
    * desktop opens a native save dialog. Backs the plugin API's `ui.saveFile`.
    */
   saveFile?(name: string, contents: string, mime?: string): Promise<void>;
+  /**
+   * Optional: discover third-party plugins installed under the open vault
+   * (e.g. `<vault>/.markdown-board/plugins/<id>/`). Desktop reads + dynamic-
+   * imports them; web leaves this undefined (first-party plugins only).
+   */
+  listLocalPlugins?(adapter: VaultAdapter): Promise<LoadablePlugin[]>;
 }

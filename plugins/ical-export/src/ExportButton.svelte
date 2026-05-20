@@ -2,7 +2,7 @@
   // View-toolbar button: builds the week's .ics from the live vault and hands
   // it to the host's saveFile (web download / desktop save dialog). Registers
   // its export closure so the palette command can trigger the same action.
-  import { getViewContext } from '@markdown-board/shell';
+  import { getViewContext } from '@markdown-board/ui';
 
   import { buildICalForWeek, icalFilename } from './ical.js';
   import { getApi, setExporter } from './context.js';

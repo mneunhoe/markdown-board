@@ -47,7 +47,7 @@
   } from '@markdown-board/plugin-api';
   import { type Command } from './lib/commands.js';
   import { createPluginHost } from './lib/plugins/registry.svelte.js';
-  import { FIRST_PARTY_PLUGINS, type FirstPartyPlugin } from './lib/plugins/first-party.js';
+  import { FIRST_PARTY_PLUGINS } from './lib/plugins/first-party.js';
   import { activatePlugin, type PluginHandle } from './lib/plugins/loader.js';
   import { createScopedStorage } from './lib/plugins/storage.js';
   import { resolvePluginSettings } from './lib/plugins/plugin-settings.js';
@@ -74,6 +74,7 @@
   } from './lib/theme/index.js';
   import type {
     ExternalOpenEvent,
+    LoadablePlugin,
     RecentVault,
     VaultAdapter,
     VaultPlatform,
@@ -167,9 +168,17 @@
   const pluginHandles = new Map<string, PluginHandle>();
   // Transient message surfaced via the plugin API's `ui.notify`.
   let pluginNotice = $state<string | null>(null);
-  // Manifests listed in Settings → Plugins (first-party for now; third-party
-  // discovery lands later).
-  const pluginManifests = FIRST_PARTY_PLUGINS.map((fp) => fp.manifest);
+  // Third-party plugins discovered under the open vault (desktop only).
+  let thirdPartyPlugins = $state<LoadablePlugin[]>([]);
+  // Manifests listed in Settings → Plugins: bundled first-party + discovered
+  // third-party (deduped, first-party precedence).
+  const pluginManifests = $derived.by(() => {
+    const seen = new Set(FIRST_PARTY_PLUGINS.map((p) => p.manifest.id));
+    return [
+      ...FIRST_PARTY_PLUGINS.map((p) => p.manifest),
+      ...thirdPartyPlugins.filter((p) => !seen.has(p.manifest.id)).map((p) => p.manifest),
+    ];
+  });
 
   let adapter: VaultAdapter | null = null;
   let autosaver: Autosaver | null = null;
@@ -357,17 +366,17 @@
   // Every registration / hook subscription is tracked so the loader can undo
   // them on deactivate.
   function buildPluginContext(
-    fp: FirstPartyPlugin,
+    plugin: LoadablePlugin,
     currentAdapter: VaultAdapter,
   ): { context: PluginContext; disposables: Disposable[] } {
-    const id = fp.manifest.id;
+    const id = plugin.manifest.id;
     const disposables: Disposable[] = [];
     const track = (d: Disposable): Disposable => {
       disposables.push(d);
       return d;
     };
     const context: PluginContext = {
-      manifest: fp.manifest,
+      manifest: plugin.manifest,
       appVersion: PLUGIN_API_VERSION,
       commands: {
         register: (cid, run, opts) => track(pluginHost.registerCommand(id, cid, run, opts)),
@@ -401,7 +410,9 @@
           pluginNotice = message;
         },
       },
-      settings: { get: () => resolvePluginSettings(fp.manifest.settings, settings.plugins[id]) },
+      settings: {
+        get: () => resolvePluginSettings(plugin.manifest.settings, settings.plugins[id]),
+      },
       log: {
         info: (...args) => console.info(`[plugin:${id}]`, ...args),
         warn: (...args) => console.warn(`[plugin:${id}]`, ...args),
@@ -436,12 +447,28 @@
   async function reconcilePlugins(): Promise<void> {
     const currentAdapter = adapter;
     if (!loaded || !currentAdapter) {
+      thirdPartyPlugins = [];
       await teardownPlugins();
       return;
     }
-    const desired = new Map<string, FirstPartyPlugin>();
-    for (const fp of FIRST_PARTY_PLUGINS) {
-      if (settings.plugins[fp.manifest.id]?.enabled !== false) desired.set(fp.manifest.id, fp);
+    // Discover third-party plugins under the vault (desktop only). A discovery
+    // failure must not block the bundled plugins.
+    let local: LoadablePlugin[] = [];
+    try {
+      local = (await platform.listLocalPlugins?.(currentAdapter)) ?? [];
+    } catch (err) {
+      error = `Couldn't scan local plugins: ${err instanceof Error ? err.message : String(err)}`;
+    }
+    thirdPartyPlugins = local;
+
+    // First-party precedence on id collision.
+    const all = new Map<string, LoadablePlugin>();
+    for (const p of [...FIRST_PARTY_PLUGINS, ...local]) {
+      if (!all.has(p.manifest.id)) all.set(p.manifest.id, p);
+    }
+    const desired = new Map<string, LoadablePlugin>();
+    for (const [id, p] of all) {
+      if (settings.plugins[id]?.enabled !== false) desired.set(id, p);
     }
     // Deactivate plugins that are no longer wanted.
     for (const [id, handle] of [...pluginHandles]) {
@@ -454,12 +481,12 @@
       }
     }
     // Activate newly wanted plugins (a disabled plugin's code is never imported).
-    for (const [id, fp] of desired) {
+    for (const [id, plugin] of desired) {
       if (pluginHandles.has(id)) continue;
       try {
-        const mod = await fp.load();
-        const { context, disposables } = buildPluginContext(fp, currentAdapter);
-        pluginHandles.set(id, await activatePlugin(mod, fp.manifest, context, disposables));
+        const mod = await plugin.load();
+        const { context, disposables } = buildPluginContext(plugin, currentAdapter);
+        pluginHandles.set(id, await activatePlugin(mod, plugin.manifest, context, disposables));
       } catch (err) {
         error = `Plugin "${id}" failed to load: ${err instanceof Error ? err.message : String(err)}`;
       }

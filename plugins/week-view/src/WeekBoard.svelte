@@ -9,8 +9,7 @@
     weekStart,
     type Day,
   } from '@markdown-board/core';
-  import { getViewContext } from '@markdown-board/shell';
-  import { TaskCard } from '@markdown-board/ui';
+  import { TaskCard, getViewContext } from '@markdown-board/ui';
 
   import { getApi } from './context.js';
 

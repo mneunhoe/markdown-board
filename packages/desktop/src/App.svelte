@@ -5,6 +5,7 @@
   import { stat, writeTextFile } from '@tauri-apps/plugin-fs';
   import { TauriFileAdapter } from './lib/adapters/index.js';
   import { subscribeFolderDrop } from './lib/dnd.js';
+  import { listLocalPlugins } from './lib/plugins.js';
   import { loadRecents, recordRecent, removeRecent } from './lib/recents.js';
   import { TauriExternalChangeWatcher } from './lib/vault/index.js';
 
@@ -56,6 +57,7 @@
       if (!path) return; // user cancelled the dialog
       await writeTextFile(path, contents);
     },
+    listLocalPlugins: (adapter) => listLocalPlugins(adapter),
   };
 </script>
 

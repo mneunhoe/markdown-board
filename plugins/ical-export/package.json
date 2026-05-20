@@ -27,7 +27,7 @@
   "dependencies": {
     "@markdown-board/core": "workspace:*",
     "@markdown-board/plugin-api": "workspace:*",
-    "@markdown-board/shell": "workspace:*"
+    "@markdown-board/ui": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",

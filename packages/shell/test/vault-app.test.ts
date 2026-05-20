@@ -1,6 +1,6 @@
 import { InMemoryAdapter } from '@markdown-board/core';
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import VaultApp from '../src/VaultApp.svelte';
 import type {
@@ -102,6 +102,49 @@ describe('VaultApp (shell, injected platform)', () => {
       () => expect(container.querySelector('[data-testid="pomodoro-chip"]')).toBeTruthy(),
       { timeout: 5000 },
     );
+  });
+
+  it('loads a third-party plugin from a local path: its command appears and runs', async () => {
+    const ran = vi.fn();
+    const adapter = new TestVaultAdapter({ 'TASKS.md': '## Active\n- [ ] A task\n' });
+    // A platform that "discovers" one local plugin (as the desktop loader would).
+    const platform = makeFakePlatform(adapter, {
+      listLocalPlugins: () =>
+        Promise.resolve([
+          {
+            manifest: {
+              id: 'hello',
+              name: 'Hello',
+              version: '1.0.0',
+              entry: 'main.js',
+              minAppVersion: '1.0.0',
+            },
+            load: () =>
+              Promise.resolve({
+                activate(ctx) {
+                  ctx.commands.register('greet', () => ran(), { title: 'Hello: greet' });
+                },
+              }),
+          },
+        ]),
+    });
+    const { container } = render(VaultApp, { props: { platform } });
+    await fireEvent.click(
+      container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+    );
+    await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+
+    // The plugin's command shows up in the palette (after async activation).
+    await fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    const input = container.querySelector<HTMLInputElement>('[data-testid="palette-input"]')!;
+    await waitFor(async () => {
+      await fireEvent.input(input, { target: { value: 'hello greet' } });
+      expect(container.querySelector('[data-testid="palette-item"]')?.textContent).toContain(
+        'Hello: greet',
+      );
+    });
+    await fireEvent.click(container.querySelector('[data-testid="palette-item"]')!);
+    expect(ran).toHaveBeenCalledOnce();
   });
 
   it('does not mount the pomodoro chip when the plugin is disabled in settings', async () => {

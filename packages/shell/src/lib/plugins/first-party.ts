@@ -7,14 +7,9 @@
 // Entries are added as each first-party plugin lands (S7 pomodoro, S8
 // week-view, S9 ical-export).
 
-import type { PluginManifest, PluginModule } from '@markdown-board/plugin-api';
+import type { LoadablePlugin } from '../platform.js';
 
-export interface FirstPartyPlugin {
-  manifest: PluginManifest;
-  load: () => Promise<PluginModule>;
-}
-
-export const FIRST_PARTY_PLUGINS: readonly FirstPartyPlugin[] = [
+export const FIRST_PARTY_PLUGINS: readonly LoadablePlugin[] = [
   {
     manifest: {
       id: 'pomodoro',

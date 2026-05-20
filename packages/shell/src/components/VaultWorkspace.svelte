@@ -25,11 +25,11 @@
     type TaskUnresolveHandler,
     type TitleEditHandler,
   } from '@markdown-board/ui';
+  import { setViewContext } from '@markdown-board/ui';
   import TabBar from './TabBar.svelte';
   import SlotRenderer from './SlotRenderer.svelte';
   import { TABS, type TabDescriptor, type TabKey } from '../lib/tabs.js';
   import type { RegisteredSlot, RegisteredView } from '../lib/plugins/registry.svelte.js';
-  import { setViewContext } from '../lib/plugins/view-context.js';
 
   interface Props {
     vault: Vault;

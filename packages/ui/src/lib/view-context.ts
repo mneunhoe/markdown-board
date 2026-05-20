@@ -1,19 +1,22 @@
 // View context — the bridge a plugin-contributed view reads to render against
-// the open vault. VaultWorkspace (which already owns the vault + handler
-// props) publishes it via `setViewContext`; a plugin view component reads it
-// via `getViewContext()`. Getters (not snapshots) so reads stay reactive.
+// the open vault. The host (shell's VaultWorkspace) publishes it via
+// `setViewContext`; a plugin view component reads it via `getViewContext()`.
+// Getters (not snapshots) so reads stay reactive.
+//
+// Lives in `ui` (alongside the handler types it references) rather than the
+// shell so plugins can depend on it without a shell↔plugin dependency cycle.
 
 import { getContext, setContext } from 'svelte';
 
 import type { LibraryDoc, Vault } from '@markdown-board/core';
+
+import type { ColumnMoveHandler, TaskMoveHandler } from './dnd.js';
 import type {
-  ColumnMoveHandler,
   DayEditOpenHandler,
   FullTaskEditHandler,
   NoteEditHandler,
   PriorityCycleHandler,
   ProjectEditOpenHandler,
-  ResolveHandler,
   SectionAddHandler,
   SectionDeleteHandler,
   SectionRenameHandler,
@@ -22,9 +25,9 @@ import type {
   SubtaskToggleHandler,
   TaskAddHandler,
   TaskDeleteHandler,
-  TaskMoveHandler,
   TitleEditHandler,
-} from '@markdown-board/ui';
+} from './edit.js';
+import type { ResolveHandler } from './resolve.js';
 
 /** The same optional handler set VaultWorkspace forwards to the built-in views. */
 export interface ViewHandlers {
@@ -56,7 +59,7 @@ export interface ViewContext {
   getHandlers: () => ViewHandlers;
 }
 
-const VIEW_CONTEXT_KEY = Symbol('markdown-board:view-context');
+const VIEW_CONTEXT_KEY = Symbol('mb:view-context');
 
 export function setViewContext(ctx: ViewContext): void {
   setContext(VIEW_CONTEXT_KEY, ctx);

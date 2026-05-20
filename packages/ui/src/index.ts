@@ -25,6 +25,12 @@ export {
   type TaskActionsAccessor,
 } from './lib/task-actions.js';
 export {
+  getViewContext,
+  setViewContext,
+  type ViewContext,
+  type ViewHandlers,
+} from './lib/view-context.js';
+export {
   type ColumnDragData,
   type ColumnMoveHandler,
   type Edge,
