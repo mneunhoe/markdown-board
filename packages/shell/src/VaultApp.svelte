@@ -36,6 +36,7 @@
   import QuickAddModal from './components/QuickAddModal.svelte';
   import ResolveModal from './components/ResolveModal.svelte';
   import SearchModal from './components/SearchModal.svelte';
+  import SlotRenderer from './components/SlotRenderer.svelte';
   import SettingsModal from './components/SettingsModal.svelte';
   import TaskEditModal from './components/TaskEditModal.svelte';
   import VaultWorkspace from './components/VaultWorkspace.svelte';
@@ -1085,8 +1086,7 @@
         </button>
       {/if}
       {#each pluginHost.slotsFor('header') as slot (slot.pluginId + ':' + slot.seq)}
-        {@const HeaderSlot = slot.component}
-        <HeaderSlot />
+        <div class="header-slot"><SlotRenderer component={slot.component} /></div>
       {/each}
       <button
         type="button"
@@ -1306,6 +1306,11 @@
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  .header-slot {
+    display: inline-flex;
+    align-items: center;
   }
 
   .theme-warning {

@@ -27,6 +27,7 @@
   "dependencies": {
     "@markdown-board/core": "workspace:*",
     "@markdown-board/plugin-api": "workspace:*",
+    "@markdown-board/plugin-pomodoro": "workspace:*",
     "@markdown-board/ui": "workspace:*",
     "minisearch": "^7.1.0",
     "yaml": "^2.6.1"

@@ -80,39 +80,48 @@ function humanise(id: string): string {
   return last.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+interface Entry<T> {
+  /** Unique insertion sequence — the dispose key (filtering by a primitive
+   * survives Svelte's deep `$state` proxy, which would break `===` identity). */
+  seq: number;
+  value: T;
+}
+
 export function createPluginHost(onHookError?: (err: unknown) => void): PluginHost {
-  // `$state.raw`: entries are immutable once registered and we always replace
-  // the whole array (never mutate in place), so we don't want Svelte's deep
-  // proxy — it would also break identity-based dispose (`c !== entry`).
-  let commands = $state.raw<Command[]>([]);
-  let views = $state.raw<RegisteredView[]>([]);
-  let slots = $state.raw<RegisteredSlot[]>([]);
-  let taskActions = $state.raw<RegisteredTaskAction[]>([]);
+  // `$state.raw`: reassigning the whole array is reactive (host UI re-renders),
+  // but entries are NOT deep-proxied — important because they hold Svelte
+  // component references, which must keep their identity to render. Dispose
+  // filters by the primitive `seq`.
+  let commands = $state.raw<Entry<Command>[]>([]);
+  let views = $state.raw<Entry<RegisteredView>[]>([]);
+  let slots = $state.raw<Entry<RegisteredSlot>[]>([]);
+  let taskActions = $state.raw<Entry<RegisteredTaskAction>[]>([]);
   const hooks = createHookBus(onHookError);
 
   let seq = 0;
 
   return {
     get commands() {
-      return commands;
+      return commands.map((e) => e.value);
     },
     get defaultShortcuts() {
       const map: Record<string, string> = {};
-      for (const c of commands) {
-        if (c.keybinding) map[c.id] = c.keybinding;
+      for (const { value } of commands) {
+        if (value.keybinding) map[value.id] = value.keybinding;
       }
       return map;
     },
     get views() {
-      return views;
+      return views.map((e) => e.value);
     },
     slotsFor(slot) {
       return slots
+        .map((e) => e.value)
         .filter((s) => s.slot === slot)
         .sort((a, b) => a.order - b.order || a.seq - b.seq);
     },
     get taskActions() {
-      return taskActions;
+      return taskActions.map((e) => e.value);
     },
     hooks,
 
@@ -127,10 +136,11 @@ export function createPluginHost(onHookError?: (err: unknown) => void): PluginHo
         ...(opts?.keybinding ? { keybinding: opts.keybinding } : {}),
         ...(opts?.enabled === false ? { enabled: false } : {}),
       };
-      commands = [...commands, command];
+      const entrySeq = seq++;
+      commands = [...commands, { seq: entrySeq, value: command }];
       return {
         dispose() {
-          commands = commands.filter((c) => c !== command);
+          commands = commands.filter((e) => e.seq !== entrySeq);
         },
       };
     },
@@ -142,26 +152,28 @@ export function createPluginHost(onHookError?: (err: unknown) => void): PluginHo
         component,
         pluginId,
       };
-      views = [...views, view];
+      const entrySeq = seq++;
+      views = [...views, { seq: entrySeq, value: view }];
       return {
         dispose() {
-          views = views.filter((v) => v !== view);
+          views = views.filter((e) => e.seq !== entrySeq);
         },
       };
     },
 
     registerSlot(pluginId, slot, component, opts) {
+      const entrySeq = seq++;
       const entry: RegisteredSlot = {
         slot,
         component,
         order: opts?.order ?? 0,
         pluginId,
-        seq: seq++,
+        seq: entrySeq,
       };
-      slots = [...slots, entry];
+      slots = [...slots, { seq: entrySeq, value: entry }];
       return {
         dispose() {
-          slots = slots.filter((s) => s !== entry);
+          slots = slots.filter((e) => e.seq !== entrySeq);
         },
       };
     },
@@ -174,10 +186,11 @@ export function createPluginHost(onHookError?: (err: unknown) => void): PluginHo
         run: action.run,
         pluginId,
       };
-      taskActions = [...taskActions, entry];
+      const entrySeq = seq++;
+      taskActions = [...taskActions, { seq: entrySeq, value: entry }];
       return {
         dispose() {
-          taskActions = taskActions.filter((a) => a !== entry);
+          taskActions = taskActions.filter((e) => e.seq !== entrySeq);
         },
       };
     },

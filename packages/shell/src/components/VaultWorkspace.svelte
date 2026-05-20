@@ -26,6 +26,7 @@
     type TitleEditHandler,
   } from '@markdown-board/ui';
   import TabBar from './TabBar.svelte';
+  import SlotRenderer from './SlotRenderer.svelte';
   import { TABS, type TabDescriptor, type TabKey } from '../lib/tabs.js';
   import type { RegisteredSlot, RegisteredView } from '../lib/plugins/registry.svelte.js';
   import { setViewContext } from '../lib/plugins/view-context.js';
@@ -201,8 +202,7 @@
   {#if toolbarSlots.length > 0}
     <div class="view-toolbar" data-testid="view-toolbar">
       {#each toolbarSlots as slot (slot.pluginId + ':' + slot.seq)}
-        {@const ToolbarSlot = slot.component}
-        <ToolbarSlot />
+        <div class="toolbar-slot"><SlotRenderer component={slot.component} /></div>
       {/each}
     </div>
   {/if}
@@ -217,8 +217,7 @@
     {:else if active === 'overview'}
       <OverviewView {vault} {libraryDocs} />
     {:else if activePluginView}
-      {@const PluginView = activePluginView.component}
-      <PluginView />
+      <SlotRenderer component={activePluginView.component} />
     {/if}
   </div>
 </div>
@@ -238,6 +237,11 @@
     padding: 8px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-secondary);
+  }
+
+  .toolbar-slot {
+    display: inline-flex;
+    align-items: center;
   }
 
   .view {

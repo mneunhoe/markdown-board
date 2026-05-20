@@ -89,6 +89,37 @@ describe('VaultApp (shell, injected platform)', () => {
     expect(container.querySelector('[data-testid="reopen-vault"]')).toBeTruthy();
   });
 
+  it('activates the pomodoro plugin and mounts its header chip when a vault opens', async () => {
+    const adapter = new TestVaultAdapter({ 'TASKS.md': '## Active\n- [ ] A task\n' });
+    const { container } = render(VaultApp, { props: { platform: makeFakePlatform(adapter) } });
+    await fireEvent.click(
+      container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+    );
+    await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+    // The chip is contributed by the first-party pomodoro plugin (loaded via
+    // an async dynamic import, which can be slow to transform on first run).
+    await waitFor(
+      () => expect(container.querySelector('[data-testid="pomodoro-chip"]')).toBeTruthy(),
+      { timeout: 5000 },
+    );
+  });
+
+  it('does not mount the pomodoro chip when the plugin is disabled in settings', async () => {
+    localStorage.setItem(
+      'markdown-board:settings',
+      JSON.stringify({ plugins: { pomodoro: { enabled: false } } }),
+    );
+    const adapter = new TestVaultAdapter({ 'TASKS.md': '## Active\n- [ ] A task\n' });
+    const { container } = render(VaultApp, { props: { platform: makeFakePlatform(adapter) } });
+    await fireEvent.click(
+      container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+    );
+    await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+    // Give activation a chance to run, then confirm the chip never mounted.
+    await Promise.resolve();
+    expect(container.querySelector('[data-testid="pomodoro-chip"]')).toBeNull();
+  });
+
   it('opens the command palette on Cmd-K and switches view via a command', async () => {
     const adapter = new TestVaultAdapter({ 'TASKS.md': '## Active\n- [ ] A task\n' });
     const { container } = render(VaultApp, { props: { platform: makeFakePlatform(adapter) } });
