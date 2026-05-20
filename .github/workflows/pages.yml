@@ -42,10 +42,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build web app
+        # Build the web app and its workspace deps (turbo resolves the graph).
         # Project pages serve under /<repo>/, so assets must be prefixed.
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
-        run: pnpm --filter @markdown-board/web build
+        run: pnpm exec turbo run build --filter=@markdown-board/web
 
       - uses: actions/upload-pages-artifact@v3
         with:
