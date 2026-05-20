@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { PluginManifest, SettingsField } from '@markdown-board/plugin-api';
   import { ModalShell, projectColor, projectColorHex } from '@markdown-board/ui';
   import {
     AUTOSAVE_DELAY_MAX,
@@ -9,6 +10,7 @@
     type Settings,
     type ThemeChoice,
   } from '../lib/settings.js';
+  import { resolvePluginSettings } from '../lib/plugins/plugin-settings.js';
   import { DEFAULT_SHORTCUTS, normaliseCombo, resolveShortcuts } from '../lib/shortcuts.js';
   import type { ThemeStatus } from '../lib/theme/index.js';
 
@@ -22,6 +24,8 @@
     /** Distinct short project names to offer colour overrides for. */
     projects?: string[];
     onReloadTheme?: () => void;
+    /** Discovered plugins (manifests) to list with enable/disable + settings. */
+    plugins?: readonly PluginManifest[];
   }
 
   const {
@@ -33,6 +37,7 @@
     themeStatus = { state: 'none', errors: [] },
     projects = [],
     onReloadTheme,
+    plugins = [],
   }: Props = $props();
 
   const THEME_LABELS: Record<ThemeChoice, string> = {
@@ -96,6 +101,37 @@
     const next = { ...settings.projectColorOverrides };
     delete next[name];
     onChange({ ...settings, projectColorOverrides: next });
+  }
+
+  // ── Plugins ──────────────────────────────────────────────────────────────
+  function pluginEnabled(id: string): boolean {
+    return settings.plugins[id]?.enabled !== false;
+  }
+
+  function setPluginEnabled(id: string, enabled: boolean): void {
+    const prev = settings.plugins[id] ?? { enabled: true };
+    onChange({ ...settings, plugins: { ...settings.plugins, [id]: { ...prev, enabled } } });
+  }
+
+  function pluginValue(manifest: PluginManifest, key: string): unknown {
+    return resolvePluginSettings(manifest.settings, settings.plugins[manifest.id])[key];
+  }
+
+  function setPluginValue(id: string, key: string, value: unknown): void {
+    const prev = settings.plugins[id] ?? { enabled: true };
+    onChange({
+      ...settings,
+      plugins: { ...settings.plugins, [id]: { ...prev, [key]: value } },
+    });
+  }
+
+  function clampField(field: SettingsField, value: number): number {
+    let n = value;
+    if (field.type === 'number') {
+      if (field.min !== undefined) n = Math.max(field.min, n);
+      if (field.max !== undefined) n = Math.min(field.max, n);
+    }
+    return n;
   }
 </script>
 
@@ -251,9 +287,73 @@
 
   <section class="settings-section">
     <h4 class="section-title">Plugins</h4>
-    <p class="hint" data-testid="plugins-placeholder">
-      Per-plugin enable/disable arrives with the plugin system in a later release.
-    </p>
+    {#if plugins.length === 0}
+      <p class="hint" data-testid="plugins-empty">No plugins installed.</p>
+    {:else}
+      <ul class="plugin-list">
+        {#each plugins as manifest (manifest.id)}
+          {@const enabled = pluginEnabled(manifest.id)}
+          <li class="plugin-row" data-plugin={manifest.id}>
+            <div class="plugin-head">
+              <label class="plugin-toggle">
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  data-testid="plugin-toggle-{manifest.id}"
+                  onchange={(e) => setPluginEnabled(manifest.id, e.currentTarget.checked)}
+                />
+                <span class="plugin-name">{manifest.name}</span>
+                <span class="plugin-version">v{manifest.version}</span>
+              </label>
+            </div>
+            {#if manifest.description}
+              <p class="hint plugin-desc">{manifest.description}</p>
+            {/if}
+            {#if enabled && manifest.settings && manifest.settings.length > 0}
+              <div class="plugin-settings">
+                {#each manifest.settings as field (field.key)}
+                  <label class="plugin-field">
+                    <span class="plugin-field-label">{field.label}</span>
+                    {#if field.type === 'boolean'}
+                      <input
+                        type="checkbox"
+                        checked={Boolean(pluginValue(manifest, field.key))}
+                        data-testid="plugin-{manifest.id}-{field.key}"
+                        onchange={(e) =>
+                          setPluginValue(manifest.id, field.key, e.currentTarget.checked)}
+                      />
+                    {:else if field.type === 'number'}
+                      <input
+                        type="number"
+                        min={field.min}
+                        max={field.max}
+                        value={Number(pluginValue(manifest, field.key))}
+                        data-testid="plugin-{manifest.id}-{field.key}"
+                        onchange={(e) =>
+                          setPluginValue(
+                            manifest.id,
+                            field.key,
+                            clampField(field, Number(e.currentTarget.value)),
+                          )}
+                      />
+                    {:else}
+                      <input
+                        type="text"
+                        value={String(pluginValue(manifest, field.key) ?? '')}
+                        data-testid="plugin-{manifest.id}-{field.key}"
+                        onchange={(e) =>
+                          setPluginValue(manifest.id, field.key, e.currentTarget.value)}
+                      />
+                    {/if}
+                  </label>
+                {/each}
+              </div>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+      <p class="hint">Plugins run in-process with full access to your vault.</p>
+    {/if}
   </section>
 </ModalShell>
 
@@ -449,5 +549,66 @@
     padding: 1px 5px;
     background: var(--bg-secondary);
     border-radius: 3px;
+  }
+
+  .plugin-list {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .plugin-toggle {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    cursor: pointer;
+  }
+
+  .plugin-name {
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .plugin-version {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .plugin-desc {
+    margin: 4px 0 0 22px;
+  }
+
+  .plugin-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 8px 0 0 22px;
+  }
+
+  .plugin-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12px;
+  }
+
+  .plugin-field input[type='number'],
+  .plugin-field input[type='text'] {
+    width: 80px;
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 12px;
+  }
+
+  .plugin-field input[type='text'] {
+    width: 160px;
   }
 </style>

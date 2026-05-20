@@ -230,4 +230,97 @@ describe('SettingsModal', () => {
     await fireEvent.click(resetBtn);
     expect(onChange).toHaveBeenCalledWith(settingsWith({ shortcuts: {} }));
   });
+
+  describe('Plugins section', () => {
+    const manifest = {
+      id: 'pomodoro',
+      name: 'Pomodoro',
+      version: '1.0.0',
+      entry: '',
+      minAppVersion: '1.0.0',
+      description: 'A focus timer.',
+      settings: [
+        {
+          key: 'focus',
+          label: 'Focus minutes',
+          type: 'number' as const,
+          default: 25,
+          min: 1,
+          max: 180,
+        },
+      ],
+    };
+
+    it('shows an empty hint when no plugins are installed', () => {
+      const { container } = render(SettingsModal, {
+        open: true,
+        settings: DEFAULT_SETTINGS,
+        onChange: () => {},
+        onClose: () => {},
+      });
+      expect(container.querySelector('[data-testid="plugins-empty"]')).toBeTruthy();
+    });
+
+    it('lists a plugin with its name, version, and an enabled toggle', () => {
+      const { container } = render(SettingsModal, {
+        open: true,
+        settings: DEFAULT_SETTINGS,
+        onChange: () => {},
+        onClose: () => {},
+        plugins: [manifest],
+      });
+      const row = container.querySelector('[data-plugin="pomodoro"]')!;
+      expect(row.textContent).toContain('Pomodoro');
+      expect(row.textContent).toContain('v1.0.0');
+      const toggle = container.querySelector<HTMLInputElement>(
+        '[data-testid="plugin-toggle-pomodoro"]',
+      );
+      expect(toggle?.checked).toBe(true); // default enabled
+    });
+
+    it('disabling a plugin calls onChange with enabled:false', async () => {
+      const onChange = vi.fn();
+      const { container } = render(SettingsModal, {
+        open: true,
+        settings: DEFAULT_SETTINGS,
+        onChange,
+        onClose: () => {},
+        plugins: [manifest],
+      });
+      await fireEvent.click(container.querySelector('[data-testid="plugin-toggle-pomodoro"]')!);
+      expect(onChange).toHaveBeenCalledWith(
+        settingsWith({ plugins: { pomodoro: { enabled: false } } }),
+      );
+    });
+
+    it('renders schema settings for an enabled plugin and edits them', async () => {
+      const onChange = vi.fn();
+      const { container } = render(SettingsModal, {
+        open: true,
+        settings: DEFAULT_SETTINGS,
+        onChange,
+        onClose: () => {},
+        plugins: [manifest],
+      });
+      const input = container.querySelector<HTMLInputElement>(
+        '[data-testid="plugin-pomodoro-focus"]',
+      )!;
+      expect(input.value).toBe('25'); // default applied
+      await fireEvent.change(input, { target: { value: '40' } });
+      expect(onChange).toHaveBeenCalledWith(
+        settingsWith({ plugins: { pomodoro: { enabled: true, focus: 40 } } }),
+      );
+    });
+
+    it('hides schema settings when the plugin is disabled', () => {
+      const { container } = render(SettingsModal, {
+        open: true,
+        settings: settingsWith({ plugins: { pomodoro: { enabled: false } } }),
+        onChange: () => {},
+        onClose: () => {},
+        plugins: [manifest],
+      });
+      expect(container.querySelector('[data-testid="plugin-pomodoro-focus"]')).toBeNull();
+    });
+  });
 });

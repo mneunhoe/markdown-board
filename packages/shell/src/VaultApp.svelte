@@ -167,6 +167,9 @@
   const pluginHandles = new Map<string, PluginHandle>();
   // Transient message surfaced via the plugin API's `ui.notify`.
   let pluginNotice = $state<string | null>(null);
+  // Manifests listed in Settings → Plugins (first-party for now; third-party
+  // discovery lands later).
+  const pluginManifests = FIRST_PARTY_PLUGINS.map((fp) => fp.manifest);
 
   let adapter: VaultAdapter | null = null;
   let autosaver: Autosaver | null = null;
@@ -1220,6 +1223,7 @@
     {vaultPath}
     {themeStatus}
     projects={projectColorTargets}
+    plugins={pluginManifests}
     onReloadTheme={applyVaultTheme}
     onChange={handleSettingsChange}
     onClose={() => (settingsOpen = false)}
