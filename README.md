@@ -10,9 +10,9 @@ no cloud.
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 
 <!-- Hero screenshot. Drop docs/assets/hero-board.png in to replace this. -->
-[![markdown-board Kanban board](./docs/assets/hero-board.png)](https://marcel-neunhoeffer.com/markdown-board/)
+[![markdown-board Kanban board](./docs/assets/hero-board.png)](https://www.marcel-neunhoeffer.com/markdown-board/)
 
-**[Try the live web demo →](https://marcel-neunhoeffer.com/markdown-board/)**
+**[Try the live web demo →](https://www.marcel-neunhoeffer.com/markdown-board/)**
 (opens a folder on your machine — nothing leaves your device)
 
 > **Status: personal work-in-progress.** This is the rewrite of a single-file
@@ -79,7 +79,7 @@ no cloud.
 ## Try it
 
 **Web demo (nothing to install):** open
-[the live demo](https://marcel-neunhoeffer.com/markdown-board/) in a Chromium
+[the live demo](https://www.marcel-neunhoeffer.com/markdown-board/) in a Chromium
 browser and point it at any folder containing a `TASKS.md`. Files stay on your
 machine (it uses the File System Access API).
 
