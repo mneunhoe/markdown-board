@@ -32,7 +32,12 @@
   import TaskEditModal from './components/TaskEditModal.svelte';
   import VaultWorkspace from './components/VaultWorkspace.svelte';
   import { applyTheme, loadSettings, saveSettings, type Settings } from './lib/settings.js';
-  import type { VaultAdapter, VaultPlatform, VaultWatcher } from './lib/platform.js';
+  import type {
+    ExternalOpenEvent,
+    VaultAdapter,
+    VaultPlatform,
+    VaultWatcher,
+  } from './lib/platform.js';
   import {
     Autosaver,
     addSection,
@@ -69,6 +74,8 @@
   let loaded = $state<LoadedVault | null>(null);
   let loading = $state(false);
   let error = $state<string | null>(null);
+  // True while a folder is being dragged over the window (desktop DnD).
+  let dragActive = $state(false);
   let lastWrittenMd = $state<string>('');
   /** Captured at modal-open time so a concurrent external reload can't shift the target. */
   let resolveTarget = $state<{ task: Task; section: Section } | null>(null);
@@ -101,6 +108,32 @@
       const next = await platform.pickVault();
       if (!next) return; // user cancelled
       await mountVault(next);
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    } finally {
+      loading = false;
+    }
+  }
+
+  // Host-driven opens (desktop drag-and-drop, later the recent-vaults menu)
+  // arrive through the platform's optional `subscribeExternalOpen` channel.
+  // The shell owns the mount/error/loading reaction so the host stays a thin
+  // event translator.
+  async function handleExternalOpen(event: ExternalOpenEvent): Promise<void> {
+    if (event.kind === 'dragstate') {
+      dragActive = event.active;
+      return;
+    }
+    if (event.kind === 'error') {
+      dragActive = false;
+      error = event.message;
+      return;
+    }
+    dragActive = false;
+    error = null;
+    loading = true;
+    try {
+      await mountVault(event.adapter);
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     } finally {
@@ -467,6 +500,13 @@
   $effect(() => {
     return () => teardownIo();
   });
+
+  // Subscribe to host-driven open events (e.g. desktop drag-and-drop). No-op
+  // on platforms that don't implement the channel (web).
+  $effect(() => {
+    const unsubscribe = platform.subscribeExternalOpen?.(handleExternalOpen);
+    return () => unsubscribe?.();
+  });
 </script>
 
 <main class="shell">
@@ -591,6 +631,15 @@
     onConfirm={confirmTaskEditor}
     onCancel={cancelTaskEditor}
   />
+
+  {#if dragActive}
+    <div class="drop-overlay" data-testid="drop-overlay">
+      <div class="drop-card">
+        <p class="drop-title">Drop a folder to open it as a vault</p>
+        <p class="drop-hint">The folder should contain a TASKS.md and an optional library/.</p>
+      </div>
+    </div>
+  {/if}
 </main>
 
 <style>
@@ -686,5 +735,38 @@
     color: var(--priority-high);
     font-size: 13px;
     text-align: center;
+  }
+
+  .drop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--bg-secondary) 75%, transparent);
+    backdrop-filter: blur(2px);
+    pointer-events: none;
+  }
+
+  .drop-card {
+    border: 2px dashed var(--accent);
+    border-radius: 12px;
+    padding: 28px 36px;
+    background: var(--bg-card);
+    text-align: center;
+  }
+
+  .drop-title {
+    margin: 0 0 6px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .drop-hint {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-secondary);
   }
 </style>

@@ -2,6 +2,7 @@
   import { VaultApp, type VaultPlatform } from '@markdown-board/shell';
   import { open } from '@tauri-apps/plugin-dialog';
   import { TauriFileAdapter } from './lib/adapters/index.js';
+  import { subscribeFolderDrop } from './lib/dnd.js';
   import { TauriExternalChangeWatcher } from './lib/vault/index.js';
 
   const platform: VaultPlatform = {
@@ -15,6 +16,7 @@
         ...deps,
         watchPath: (adapter as TauriFileAdapter).rootPath,
       }),
+    subscribeExternalOpen: (handler) => subscribeFolderDrop(handler),
   };
 </script>
 

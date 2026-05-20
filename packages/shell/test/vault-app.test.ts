@@ -3,7 +3,12 @@ import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import VaultApp from '../src/VaultApp.svelte';
-import type { VaultAdapter, VaultPlatform, VaultWatcher } from '../src/lib/platform.js';
+import type {
+  ExternalOpenHandler,
+  VaultAdapter,
+  VaultPlatform,
+  VaultWatcher,
+} from '../src/lib/platform.js';
 
 // A VaultAdapter is a core FileAdapter + getMtime. InMemoryAdapter covers
 // the FileAdapter surface; the shell only needs a monotonic getMtime for
@@ -100,5 +105,51 @@ describe('VaultApp (shell, injected platform)', () => {
     const { container } = render(VaultApp, { props: { platform } });
     expect(container.querySelector('.empty-title')?.textContent?.trim()).toBe('Not here');
     expect(container.querySelector('[data-testid="pick-vault"]')).toBeNull();
+  });
+
+  describe('external-open channel (e.g. desktop drag-and-drop)', () => {
+    // Capture the handler the shell registers so the test can drive
+    // external-open events the way the desktop DnD wiring would.
+    function platformWithExternalOpen(): {
+      platform: VaultPlatform;
+      emit: ExternalOpenHandler;
+    } {
+      let captured: ExternalOpenHandler = () => {};
+      const platform = makeFakePlatform(null, {
+        subscribeExternalOpen: (handler) => {
+          captured = handler;
+          return () => {};
+        },
+      });
+      return { platform, emit: (event) => captured(event) };
+    }
+
+    it('toggles the drop overlay on dragstate events', async () => {
+      const { platform, emit } = platformWithExternalOpen();
+      const { container } = render(VaultApp, { props: { platform } });
+      expect(container.querySelector('[data-testid="drop-overlay"]')).toBeNull();
+      await emit({ kind: 'dragstate', active: true });
+      expect(container.querySelector('[data-testid="drop-overlay"]')).toBeTruthy();
+      await emit({ kind: 'dragstate', active: false });
+      expect(container.querySelector('[data-testid="drop-overlay"]')).toBeNull();
+    });
+
+    it('mounts a vault pushed through an open event', async () => {
+      const adapter = new TestVaultAdapter({ 'TASKS.md': '## Active\n- [ ] Dropped in\n' });
+      const { platform, emit } = platformWithExternalOpen();
+      const { container } = render(VaultApp, { props: { platform } });
+      await emit({ kind: 'open', adapter });
+      await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+      expect(container.textContent).toContain('Dropped in');
+    });
+
+    it('surfaces an external-open error via role=alert and clears the overlay', async () => {
+      const { platform, emit } = platformWithExternalOpen();
+      const { container } = render(VaultApp, { props: { platform } });
+      await emit({ kind: 'dragstate', active: true });
+      await emit({ kind: 'error', message: 'Drop a folder, not a file, to open it as a vault.' });
+      expect(container.querySelector('[data-testid="drop-overlay"]')).toBeNull();
+      expect(container.querySelector('[role=alert]')?.textContent).toContain('Drop a folder');
+    });
   });
 });

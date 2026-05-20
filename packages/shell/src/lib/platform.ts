@@ -39,6 +39,19 @@ export interface VaultWatcher {
   dispose(): void;
 }
 
+/**
+ * An open request pushed by the host from *outside* the picker — desktop
+ * drag-and-drop today, the recent-vaults menu later. The shell owns the
+ * mount/error/loading reaction; the host only translates its native events
+ * into these.
+ */
+export type ExternalOpenEvent =
+  | { kind: 'open'; adapter: VaultAdapter }
+  | { kind: 'error'; message: string }
+  | { kind: 'dragstate'; active: boolean };
+
+export type ExternalOpenHandler = (event: ExternalOpenEvent) => void | Promise<void>;
+
 export interface VaultPlatform {
   /**
    * Pick a vault folder and build an adapter for it. Resolves to `null`
@@ -52,4 +65,9 @@ export interface VaultPlatform {
   isSupported(): boolean;
   /** Copy for the "can't open a vault here" empty state. Web-only in practice. */
   unsupportedMessage?: { title: string; hint: string };
+  /**
+   * Optional: subscribe to host-driven open requests (desktop drag-and-drop,
+   * recent-vaults menu). Returns an unsubscribe fn. Unimplemented on web.
+   */
+  subscribeExternalOpen?(handler: ExternalOpenHandler): () => void;
 }
