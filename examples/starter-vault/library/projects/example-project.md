@@ -10,6 +10,8 @@
 
 What we're trying to accomplish, in one paragraph. Free-form Markdown below.
 
+**Related:** [[Website Redesign]]
+
 ## Open questions
 
 - What does "done" look like?
