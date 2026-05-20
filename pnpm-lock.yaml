@@ -61,9 +61,18 @@ importers:
       '@markdown-board/core':
         specifier: workspace:*
         version: link:../core
+      '@markdown-board/shell':
+        specifier: workspace:*
+        version: link:../shell
+      '@markdown-board/ui':
+        specifier: workspace:*
+        version: link:../ui
       '@tauri-apps/api':
         specifier: ^2.1.1
         version: 2.11.0
+      '@tauri-apps/plugin-dialog':
+        specifier: ^2.0.0
+        version: 2.7.1
       '@tauri-apps/plugin-fs':
         specifier: ^2.0.0
         version: 2.5.1
@@ -101,6 +110,43 @@ importers:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+
+  packages/shell:
+    dependencies:
+      '@markdown-board/core':
+        specifier: workspace:*
+        version: link:../core
+      '@markdown-board/ui':
+        specifier: workspace:*
+        version: link:../ui
+    devDependencies:
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^4.0.0
+        version: 4.0.4(svelte@5.55.7(@typescript-eslint/types@8.59.3))(vite@5.4.21(@types/node@22.19.19))
+      '@testing-library/svelte':
+        specifier: ^5.2.4
+        version: 5.3.1(svelte@5.55.7(@typescript-eslint/types@8.59.3))(vite@5.4.21(@types/node@22.19.19))(vitest@2.1.9(@types/node@22.19.19)(happy-dom@15.11.7))
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.19.19
+      happy-dom:
+        specifier: ^15.11.6
+        version: 15.11.7
+      svelte:
+        specifier: ^5.2.0
+        version: 5.55.7(@typescript-eslint/types@8.59.3)
+      svelte-check:
+        specifier: ^4.0.9
+        version: 4.4.8(picomatch@4.0.4)(svelte@5.55.7(@typescript-eslint/types@8.59.3))(typescript@5.9.3)
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vite:
+        specifier: ^5.4.11
+        version: 5.4.21(@types/node@22.19.19)
+      vitest:
+        specifier: ^2.1.4
+        version: 2.1.9(@types/node@22.19.19)(happy-dom@15.11.7)
 
   packages/ui:
     dependencies:
@@ -147,6 +193,9 @@ importers:
       '@markdown-board/core':
         specifier: workspace:*
         version: link:../core
+      '@markdown-board/shell':
+        specifier: workspace:*
+        version: link:../shell
       '@markdown-board/ui':
         specifier: workspace:*
         version: link:../ui
@@ -727,6 +776,9 @@ packages:
     resolution: {integrity: sha512-bk3HemqvGRoy+5D/dVMUQHKMYLglD0jVnMm/0iGMH6ufZ+p8r14m6BpIixwij3PBvZdvORUp1YifTD8QxVZ1Nw==}
     engines: {node: '>= 10'}
     hasBin: true
+
+  '@tauri-apps/plugin-dialog@2.7.1':
+    resolution: {integrity: sha512-OK1UBXYt+ojcmxMktzzuyonYIFta8CmAASpX+CA+DTGK24KlHjhYI6x2iOJ/TjZF4N7/ACK1oFmEOjIY9IhzOQ==}
 
   '@tauri-apps/plugin-fs@2.5.1':
     resolution: {integrity: sha512-9Lz+Jopp6QyeEWhlpkMx4R/+P9HgR+AVAI4vOZhlT8Xaymtz8iVI/Ov984/XTqgJz/5gz5NretqPB/XEMS3NhQ==}
@@ -2362,6 +2414,10 @@ snapshots:
       '@tauri-apps/cli-win32-arm64-msvc': 2.11.2
       '@tauri-apps/cli-win32-ia32-msvc': 2.11.2
       '@tauri-apps/cli-win32-x64-msvc': 2.11.2
+
+  '@tauri-apps/plugin-dialog@2.7.1':
+    dependencies:
+      '@tauri-apps/api': 2.11.0
 
   '@tauri-apps/plugin-fs@2.5.1':
     dependencies:

@@ -1,6 +1,12 @@
 import { mount } from 'svelte';
+import { applyTheme, loadSettings } from '@markdown-board/shell';
 import App from './App.svelte';
+import '@markdown-board/ui/theme/tokens.css';
 import './app.css';
+
+// Apply the persisted theme before mount so dark-mode users don't see a
+// flash of light-theme content on first paint (mirrors the web entry).
+applyTheme(loadSettings().theme);
 
 const target = document.getElementById('app');
 if (!target) {

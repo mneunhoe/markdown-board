@@ -1,27 +1,34 @@
 {
-  "name": "@markdown-board/web",
+  "name": "@markdown-board/shell",
   "version": "0.0.0",
   "private": true,
-  "description": "Vite + Svelte 5 web demo. Opens a local vault via the File System Access API.",
+  "description": "Platform-agnostic vault shell: VaultApp orchestrator, modals, and vault helpers. Web and desktop inject their own file adapter, picker, and watcher.",
   "type": "module",
+  "main": "./src/index.ts",
+  "svelte": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "svelte": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
+    "build": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
-    "test:e2e:install": "playwright install --with-deps chromium",
     "lint": "eslint .",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
     "@markdown-board/core": "workspace:*",
-    "@markdown-board/shell": "workspace:*",
     "@markdown-board/ui": "workspace:*"
   },
   "devDependencies": {
-    "@playwright/test": "^1.60.0",
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
     "@testing-library/svelte": "^5.2.4",
     "@types/node": "^22.9.0",

@@ -41,9 +41,11 @@ export class TauriFileAdapter implements FileAdapter {
    * @param rootPath Absolute filesystem path of the vault root, in the
    *   host OS's native form (e.g. `/Users/marcel/vault` on macOS,
    *   `C:\\Users\\marcel\\vault` on Windows). Forward slashes are
-   *   accepted on all platforms by the underlying plugin-fs.
+   *   accepted on all platforms by the underlying plugin-fs. Public +
+   *   readonly so the desktop shell can hand it to the native watcher's
+   *   `watchPath`.
    */
-  constructor(private readonly rootPath: string) {}
+  constructor(readonly rootPath: string) {}
 
   async readFile(path: string): Promise<string> {
     const p = normalisePath(path);

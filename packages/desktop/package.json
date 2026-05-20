@@ -16,7 +16,10 @@
   },
   "dependencies": {
     "@markdown-board/core": "workspace:*",
+    "@markdown-board/shell": "workspace:*",
+    "@markdown-board/ui": "workspace:*",
     "@tauri-apps/api": "^2.1.1",
+    "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-fs": "^2.0.0"
   },
   "devDependencies": {

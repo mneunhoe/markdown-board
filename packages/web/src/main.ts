@@ -2,7 +2,7 @@ import { mount } from 'svelte';
 import App from './App.svelte';
 import '@markdown-board/ui/theme/tokens.css';
 import './app.css';
-import { applyTheme, loadSettings } from './lib/settings.js';
+import { applyTheme, loadSettings } from '@markdown-board/shell';
 
 // Apply the persisted theme *before* mount so dark-mode users don't
 // see a flash of light-theme content on first paint.

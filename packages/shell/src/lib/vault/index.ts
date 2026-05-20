@@ -1,11 +1,5 @@
 export { loadVault, loadArchive, type LoadedVault } from './load.js';
 export { saveLibraryFile } from './library.js';
-export {
-  FileSystemAccessUnsupportedError,
-  VaultPickerCancelledError,
-  isFileSystemAccessSupported,
-  pickVaultDirectory,
-} from './picker.js';
 export { Autosaver, type AutosaverOptions } from './autosave.js';
 export { ExternalChangeWatcher, type ExternalChangeWatcherOptions } from './watcher.js';
 export {
