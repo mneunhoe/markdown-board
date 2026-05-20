@@ -42,6 +42,6 @@ fonts:
       src: theme/fonts/FunnelSans.woff2
       weight: '300 700' # variable weight axis (Light–Bold)
 
-# Self-contained ADA avatar badge: its own dark disc keeps the mark legible
-# on both the off-white light theme and the dark theme.
-logo: theme/ada-avatar.svg
+# Generic placeholder badge (the real brand logo is not redistributed here).
+# Swap in your own logo by pointing this at any vault-relative image path.
+logo: theme/logo-placeholder.svg

@@ -4,7 +4,8 @@
 # München brand guide): LMU Grün is the single brand accent; black and the
 # four-step grey scale carry text and surfaces for a clean, institutional
 # look. Typeface is Roboto (open-source, Apache 2.0 — bundled as a variable
-# woff2 under theme/fonts/). Logo is the official flat-green LMU mark.
+# woff2 under theme/fonts/). The header logo is a generic placeholder — the
+# real LMU mark is a trademark and is not bundled here.
 name: LMU München
 
 # Header title beside the logo. Set to "" to hide it (the logo already
@@ -43,6 +44,6 @@ fonts:
       src: theme/fonts/Roboto.woff2
       weight: '100 900' # variable weight axis
 
-# Official flat-green LMU mark: its solid green field keeps the wordmark
-# legible on both the light-grey light theme and the dark theme.
-logo: theme/lmu-logo.png
+# Generic placeholder badge (the real LMU logo is a trademark and is not
+# redistributed here). Swap in your own logo via any vault-relative path.
+logo: theme/logo-placeholder.svg
