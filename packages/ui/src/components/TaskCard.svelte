@@ -83,6 +83,8 @@
   const deletable = $derived(onDelete !== undefined);
   const fullEditable = $derived(onFullEdit !== undefined);
   const unresolvable = $derived(onUnresolve !== undefined);
+  // Whether the top action-icon row has anything to show.
+  const hasActions = $derived(deletable || fullEditable || unresolvable || taskActions.length > 0);
 
   // Inline-edit state. Only one target may be active at a time. The active
   // target is mirrored to the input via bind:value; commit on Enter/blur,
@@ -145,48 +147,53 @@
 </script>
 
 <article class="task-card" class:checked={task.checked} data-task-id={task.id || null}>
+  {#if hasActions}
+    <div class="card-actions">
+      {#if unresolvable}
+        <button
+          type="button"
+          class="unresolve-btn"
+          aria-label="Unresolve {task.title}"
+          title="Move back to the active list"
+          data-testid="task-unresolve"
+          onclick={() => onUnresolve?.()}>↺</button
+        >
+      {/if}
+      {#each taskActions as action (action.key)}
+        <button
+          type="button"
+          class="task-action-btn"
+          aria-label={action.label}
+          title={action.label}
+          data-task-action={action.key}
+          onclick={() => action.run({ taskId: task.id, sectionId: sectionId! })}
+          >{action.icon ?? action.label}</button
+        >
+      {/each}
+      {#if fullEditable}
+        <button
+          type="button"
+          class="full-edit-btn"
+          aria-label="Edit {task.title} in full editor"
+          title="Edit task…"
+          data-testid="task-full-edit"
+          onclick={() => onFullEdit?.()}>✎</button
+        >
+      {/if}
+      {#if deletable}
+        <button
+          type="button"
+          class="delete-btn"
+          aria-label="Delete {task.title}"
+          title="Delete task"
+          data-testid="task-delete"
+          onclick={() => onDelete?.()}>×</button
+        >
+      {/if}
+    </div>
+  {/if}
+
   <div class="card-row">
-    {#if deletable}
-      <button
-        type="button"
-        class="delete-btn"
-        aria-label="Delete {task.title}"
-        title="Delete task"
-        data-testid="task-delete"
-        onclick={() => onDelete?.()}>×</button
-      >
-    {/if}
-    {#if fullEditable}
-      <button
-        type="button"
-        class="full-edit-btn"
-        aria-label="Edit {task.title} in full editor"
-        title="Edit task…"
-        data-testid="task-full-edit"
-        onclick={() => onFullEdit?.()}>✎</button
-      >
-    {/if}
-    {#if unresolvable}
-      <button
-        type="button"
-        class="unresolve-btn"
-        aria-label="Unresolve {task.title}"
-        title="Move back to the active list"
-        data-testid="task-unresolve"
-        onclick={() => onUnresolve?.()}>↺</button
-      >
-    {/if}
-    {#each taskActions as action (action.key)}
-      <button
-        type="button"
-        class="task-action-btn"
-        aria-label={action.label}
-        title={action.label}
-        data-task-action={action.key}
-        onclick={() => action.run({ taskId: task.id, sectionId: sectionId! })}
-        >{action.icon ?? action.label}</button
-      >
-    {/each}
     <input
       type="checkbox"
       class="card-checkbox"
@@ -356,6 +363,16 @@
   .task-card.checked .card-title {
     color: var(--text-muted);
     text-decoration: line-through;
+  }
+
+  .card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    /* Reserve the row height so revealing icons on hover doesn't shift layout. */
+    min-height: 16px;
+    margin-bottom: 2px;
   }
 
   .card-row {
