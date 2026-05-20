@@ -128,4 +128,53 @@ describe('ListView', () => {
       expect(onSectionAdd).toHaveBeenCalledWith('Doing');
     });
   });
+
+  describe('onTaskAdd', () => {
+    it('without onTaskAdd, no "+ Add task" affordance is rendered', () => {
+      const vault = makeVault([makeSection('a', 'Active')]);
+      const { container } = render(ListView, { vault });
+      expect(container.querySelector('[data-testid="list-add-task"]')).toBeNull();
+    });
+
+    it('renders a "+ Add task" row per section when onTaskAdd is provided', () => {
+      const vault = makeVault([makeSection('a', 'Active'), makeSection('d', 'Done')]);
+      const { container } = render(ListView, { vault, onTaskAdd: vi.fn() });
+      expect(container.querySelectorAll('[data-testid="list-add-task"]')).toHaveLength(2);
+    });
+
+    it('clicking the button swaps in an input; Enter commits with the section id', async () => {
+      const onTaskAdd = vi.fn();
+      const vault = makeVault([makeSection('active', 'Active'), makeSection('done', 'Done')]);
+      const { container } = render(ListView, { vault, onTaskAdd });
+      // Open the editor on the second section to confirm the section id is threaded.
+      const addButtons = container.querySelectorAll<HTMLButtonElement>(
+        '[data-testid="list-add-task"]',
+      );
+      await fireEvent.click(addButtons[1]!);
+      const input = container.querySelector<HTMLInputElement>(
+        '[data-testid="list-add-task-input"]',
+      );
+      // Only one editor open at a time.
+      expect(container.querySelectorAll('[data-testid="list-add-task-input"]')).toHaveLength(1);
+      await fireEvent.input(input!, { target: { value: 'Ship it' } });
+      await fireEvent.keyDown(input!, { key: 'Enter' });
+      expect(onTaskAdd).toHaveBeenCalledWith('done', 'Ship it');
+    });
+
+    it('Escape cancels without calling onTaskAdd', async () => {
+      const onTaskAdd = vi.fn();
+      const vault = makeVault([makeSection('a', 'Active')]);
+      const { container } = render(ListView, { vault, onTaskAdd });
+      await fireEvent.click(
+        container.querySelector<HTMLButtonElement>('[data-testid="list-add-task"]')!,
+      );
+      const input = container.querySelector<HTMLInputElement>(
+        '[data-testid="list-add-task-input"]',
+      );
+      await fireEvent.input(input!, { target: { value: 'nope' } });
+      await fireEvent.keyDown(input!, { key: 'Escape' });
+      expect(onTaskAdd).not.toHaveBeenCalled();
+      expect(container.querySelector('[data-testid="list-add-task"]')).toBeTruthy();
+    });
+  });
 });

@@ -18,6 +18,7 @@
     SubtaskAddHandler,
     SubtaskEditHandler,
     SubtaskToggleHandler,
+    TaskAddHandler,
     TaskDeleteHandler,
     TaskUnresolveHandler,
     TitleEditHandler,
@@ -56,6 +57,8 @@
     archivedTasksBySection?: Record<string, ArchivedTaskRef[]>;
     /** Slice 6g — fires when `↺` is clicked on an archived card. */
     onTaskUnresolve?: TaskUnresolveHandler;
+    /** `+ Add task` row at the bottom of each section. Omitted ⇒ hidden. */
+    onTaskAdd?: TaskAddHandler;
     /** Slice 6i — `+ Add Section` row at the bottom of the list view. */
     onSectionAdd?: SectionAddHandler;
     /**
@@ -85,6 +88,7 @@
     onFullTaskEdit,
     archivedTasksBySection = {},
     onTaskUnresolve,
+    onTaskAdd,
     onSectionAdd,
     onSectionDelete,
   }: Props = $props();
@@ -92,6 +96,7 @@
   const hasSections = $derived(vault.sections.length > 0);
   const taskDndEnabled = $derived(onTaskMove !== undefined);
   const renameable = $derived(onSectionRename !== undefined);
+  const taskAddable = $derived(onTaskAdd !== undefined);
   const sectionAddable = $derived(onSectionAdd !== undefined);
   const sectionDeletable = $derived(onSectionDelete !== undefined);
 
@@ -129,6 +134,40 @@
       event.preventDefault();
       addSectionCancelled = true;
       addingSection = false;
+    }
+  }
+
+  // Per-section "+ Add task" inline editor. Unlike BoardView (one Column
+  // instance per section, each owning its own state), ListView renders every
+  // section, so the open editor is tracked by section id.
+  let addingTaskSectionId = $state<string | null>(null);
+  let addTaskValue = $state('');
+  let addTaskCancelled = $state(false);
+  let addTaskInputEl: HTMLInputElement | undefined = $state();
+
+  function startAddTask(sectionId: string): void {
+    addingTaskSectionId = sectionId;
+    addTaskValue = '';
+    addTaskCancelled = false;
+    queueMicrotask(() => addTaskInputEl?.focus());
+  }
+
+  function commitAddTask(): void {
+    if (addingTaskSectionId === null || addTaskCancelled) return;
+    const sectionId = addingTaskSectionId;
+    addingTaskSectionId = null;
+    const next = addTaskValue.trim();
+    if (next) onTaskAdd?.(sectionId, next);
+  }
+
+  function onAddTaskKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitAddTask();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      addTaskCancelled = true;
+      addingTaskSectionId = null;
     }
   }
 
@@ -305,6 +344,27 @@
               />
             </div>
           {/each}
+          {#if taskAddable}
+            {#if addingTaskSectionId === section.id}
+              <input
+                type="text"
+                class="list-add-task-input"
+                placeholder="What needs to be done?"
+                data-testid="list-add-task-input"
+                bind:this={addTaskInputEl}
+                bind:value={addTaskValue}
+                onkeydown={onAddTaskKeydown}
+                onblur={commitAddTask}
+              />
+            {:else}
+              <button
+                type="button"
+                class="list-add-task-btn"
+                data-testid="list-add-task"
+                onclick={() => startAddTask(section.id)}>+ Add task</button
+              >
+            {/if}
+          {/if}
           <ArchivedTasksExpander
             tasks={archivedTasksBySection[section.id] ?? []}
             {...onTaskUnresolve
@@ -500,6 +560,42 @@
 
   .list-section-delete-btn:hover {
     color: var(--priority-high, #c0392b);
+  }
+
+  .list-add-task-btn {
+    appearance: none;
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 13px;
+    font-style: italic;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    margin-top: 6px;
+    align-self: flex-start;
+  }
+
+  .list-add-task-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+  }
+
+  .list-add-task-input {
+    box-sizing: border-box;
+    background: var(--bg-card);
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 13px;
+    outline: none;
+    margin-top: 6px;
+    min-width: 240px;
+    align-self: flex-start;
   }
 
   .list-add-section-btn {

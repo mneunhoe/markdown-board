@@ -189,10 +189,7 @@
     ...(onResolve ? { onResolve } : {}),
     ...editProps,
     ...archiveProps,
-    // List view exposes section-level adds but not per-column `+ Add
-    // task` — matches the prototype (only the Board carries that).
-    ...(onSectionAdd ? { onSectionAdd } : {}),
-    ...(onSectionDelete ? { onSectionDelete } : {}),
+    ...addProps,
   });
 </script>
 
