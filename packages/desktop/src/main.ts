@@ -1,6 +1,7 @@
 import { mount } from 'svelte';
 import { applyTheme, loadSettings } from '@markdown-board/shell';
 import App from './App.svelte';
+import { checkForUpdates } from './lib/updater.js';
 import '@markdown-board/ui/theme/tokens.css';
 import './app.css';
 
@@ -14,5 +15,9 @@ if (!target) {
 }
 
 const app = mount(App, { target });
+
+// Check GitHub Releases for a newer signed build. Fire-and-forget; failures
+// (offline, or running in a plain browser via `pnpm dev`) are swallowed.
+void checkForUpdates();
 
 export default app;
