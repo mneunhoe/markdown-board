@@ -123,6 +123,38 @@ describe('LibraryView', () => {
     expect(link?.textContent?.trim()).toBe('Beta');
   });
 
+  it('renders a [[wiki-link]] inside a field value as a clickable button', () => {
+    const { container } = render(LibraryView, {
+      docs: [
+        makeDoc({ title: 'Alpha', fields: { Owner: '[[Beta]]' }, rawContent: '[[Beta]]' }),
+        makeDoc({ title: 'Beta' }),
+      ],
+    });
+    const link = container.querySelector<HTMLButtonElement>(
+      '.library-fields [data-testid="wikilink"]',
+    );
+    expect(link?.getAttribute('data-target')).toBe('Beta');
+    expect(link?.textContent?.trim()).toBe('Beta');
+  });
+
+  it('renders a [[wiki-link]] inside a table cell as a clickable button', () => {
+    const { container } = render(LibraryView, {
+      docs: [
+        makeDoc({
+          title: 'Alpha',
+          tables: [{ headers: ['Who'], rows: [['[[Beta]]']] }],
+          rawContent: '[[Beta]]',
+        }),
+        makeDoc({ title: 'Beta' }),
+      ],
+    });
+    const link = container.querySelector<HTMLButtonElement>(
+      '.library-table [data-testid="wikilink"]',
+    );
+    expect(link?.getAttribute('data-target')).toBe('Beta');
+    expect(link?.textContent?.trim()).toBe('Beta');
+  });
+
   it('uses the alias label for [[Target|alias]] links', () => {
     const { container } = render(LibraryView, {
       docs: [

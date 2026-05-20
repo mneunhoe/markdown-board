@@ -65,6 +65,17 @@
   }
 </script>
 
+{#snippet wikiText(
+  content: string,
+)}{#each splitByWikiLinks(content) as seg, i (i)}{#if seg.kind === 'text'}{seg.text}{:else if linkResolves(seg.target)}<button
+        type="button"
+        class="wikilink"
+        data-testid="wikilink"
+        data-target={seg.target}
+        onclick={() => onWikiLink(seg.target)}>{seg.label}</button
+      >{:else}<span class="wikilink unresolved" data-testid="wikilink-unresolved">{seg.label}</span
+      >{/if}{/each}{/snippet}
+
 {#if hasDocs}
   <div class="library-view">
     {#each docs as doc (doc.title || doc.rawContent.slice(0, 40))}
@@ -88,7 +99,7 @@
             {#each Object.entries(doc.fields) as [key, value] (key)}
               <div class="library-field">
                 <dt>{key}</dt>
-                <dd>{value}</dd>
+                <dd>{@render wikiText(value)}</dd>
               </div>
             {/each}
           </dl>
@@ -97,16 +108,7 @@
         {#each nonIntroSections(doc) as [name, content] (name)}
           <section class="library-section">
             <h3 class="library-section-title">{name}</h3>
-            <pre
-              class="library-section-content">{#each splitByWikiLinks(content) as seg, i (i)}{#if seg.kind === 'text'}{seg.text}{:else if linkResolves(seg.target)}<button
-                    type="button"
-                    class="wikilink"
-                    data-testid="wikilink"
-                    data-target={seg.target}
-                    onclick={() => onWikiLink(seg.target)}>{seg.label}</button
-                  >{:else}<span class="wikilink unresolved" data-testid="wikilink-unresolved"
-                    >{seg.label}</span
-                  >{/if}{/each}</pre>
+            <pre class="library-section-content">{@render wikiText(content)}</pre>
           </section>
         {/each}
 
@@ -123,7 +125,7 @@
               {#each table.rows as row, r (r)}
                 <tr>
                   {#each row as cell, c (c)}
-                    <td>{cell}</td>
+                    <td>{@render wikiText(cell)}</td>
                   {/each}
                 </tr>
               {/each}
