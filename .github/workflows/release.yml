@@ -76,15 +76,23 @@ jobs:
           # artifacts + latest.json; empty otherwise (no updater bundle).
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # macOS code-signing + notarization (gated — see the codesign slice).
-          # Empty until an Apple Developer ID is available; the build still
-          # succeeds, producing an unsigned (Gatekeeper-warned) .app/.dmg.
+          # macOS code-signing + notarization. tauri-action signs and
+          # notarizes automatically when these are non-empty; when the secrets
+          # are absent they resolve to "" and the macOS job produces an
+          # unsigned (Gatekeeper-warned) .app/.dmg — no workflow change needed
+          # to flip signing on later. See docs/auto-update.md.
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Windows Authenticode signing is a follow-up (no certificate yet).
+          # Stock Tauri signs via bundle.windows.certificateThumbprint with the
+          # cert imported into the runner's store; when a cert is acquired, add
+          # a Windows-only "import certificate" step before this one and set the
+          # thumbprint. Reserved secrets: WINDOWS_CERTIFICATE,
+          # WINDOWS_CERTIFICATE_PASSWORD. See docs/auto-update.md.
         with:
           projectPath: packages/desktop
           tagName: ${{ github.ref_name }}
