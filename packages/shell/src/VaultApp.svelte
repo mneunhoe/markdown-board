@@ -98,6 +98,7 @@
     removeTask,
     renameSection,
     saveLibraryFile,
+    scaffoldVault,
     setSubtaskText,
     setTask,
     setTaskDay,
@@ -203,6 +204,25 @@
     try {
       const next = await platform.pickVault();
       if (!next) return; // user cancelled
+      await mountVault(next);
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    } finally {
+      loading = false;
+    }
+  }
+
+  // "Create new vault" reuses the same folder picker (the OS dialog lets the
+  // user make a new folder), then seeds starter files before mounting.
+  // Scaffolding is write-if-missing, so choosing a folder that already holds a
+  // vault just opens it untouched.
+  async function createAndLoad(): Promise<void> {
+    error = null;
+    loading = true;
+    try {
+      const next = await platform.pickVault();
+      if (!next) return; // user cancelled
+      await scaffoldVault(next);
       await mountVault(next);
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
@@ -1187,6 +1207,15 @@
         >
           {loading ? 'Loading…' : 'Pick a vault folder'}
         </button>
+        <button
+          type="button"
+          class="secondary"
+          onclick={createAndLoad}
+          disabled={loading}
+          data-testid="create-vault"
+        >
+          Create new vault
+        </button>
         {#if recents.length}
           <div class="recents" data-testid="recent-vaults">
             <p class="recents-label">Recent vaults</p>
@@ -1412,6 +1441,29 @@
   }
 
   .primary:disabled {
+    opacity: 0.6;
+    cursor: progress;
+  }
+
+  .secondary {
+    appearance: none;
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 8px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-left: 8px;
+  }
+
+  .secondary:hover:not(:disabled) {
+    border-color: var(--accent);
+  }
+
+  .secondary:disabled {
     opacity: 0.6;
     cursor: progress;
   }

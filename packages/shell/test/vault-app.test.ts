@@ -89,6 +89,20 @@ describe('VaultApp (shell, injected platform)', () => {
     expect(container.querySelector('[data-testid="reopen-vault"]')).toBeTruthy();
   });
 
+  it('scaffolds and mounts a starter board when "Create new vault" is clicked', async () => {
+    const adapter = new TestVaultAdapter({}); // empty folder, as a freshly created vault
+    const { container } = render(VaultApp, {
+      props: { platform: makeFakePlatform(adapter) },
+    });
+    await fireEvent.click(
+      container.querySelector<HTMLButtonElement>('[data-testid="create-vault"]')!,
+    );
+    await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+    // Starter content from scaffoldVault is now on disk and rendered.
+    expect(await adapter.readFile('TASKS.md')).toContain('Make this vault yours');
+    expect(container.textContent).toContain('Make this vault yours');
+  });
+
   it('activates the pomodoro plugin and mounts its header chip when a vault opens', async () => {
     const adapter = new TestVaultAdapter({ 'TASKS.md': '## Active\n- [ ] A task\n' });
     const { container } = render(VaultApp, { props: { platform: makeFakePlatform(adapter) } });

@@ -1,5 +1,6 @@
 export { loadVault, loadArchive, type LoadedVault } from './load.js';
 export { saveLibraryFile } from './library.js';
+export { scaffoldVault } from './scaffold.js';
 export { Autosaver, type AutosaverOptions } from './autosave.js';
 export { ExternalChangeWatcher, type ExternalChangeWatcherOptions } from './watcher.js';
 export {
