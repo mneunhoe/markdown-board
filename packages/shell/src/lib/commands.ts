@@ -18,6 +18,13 @@ export interface Command {
   run: () => void | Promise<void>;
   /** When `false`, the command is omitted from results. Defaults to enabled. */
   enabled?: boolean;
+  /**
+   * Optional default keybinding (e.g. "Mod+Shift+P"), contributed by plugin
+   * commands. Built-in defaults still live in `DEFAULT_SHORTCUTS`; this lets
+   * the host fold plugin defaults into the resolved shortcut map. Users can
+   * override via settings.
+   */
+  keybinding?: string;
 }
 
 /**

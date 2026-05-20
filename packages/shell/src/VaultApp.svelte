@@ -39,6 +39,7 @@
   import TaskEditModal from './components/TaskEditModal.svelte';
   import VaultWorkspace from './components/VaultWorkspace.svelte';
   import { type Command } from './lib/commands.js';
+  import { createPluginHost } from './lib/plugins/registry.svelte.js';
   import {
     buildSearchDocs,
     createSearchIndex,
@@ -142,6 +143,14 @@
   let themeLogoUrl = $state<string | null>(null);
   let themeStatus = $state<ThemeStatus>({ state: 'none', errors: [] });
   let vaultPath = $state<string | null>(null);
+
+  // Plugin host — holds the reactive registries (commands/views/slots/task
+  // actions) + hook bus that plugins contribute to. Plugins are activated
+  // against it once a vault is open (S3); the registries it exposes are folded
+  // into the palette, tab list, slot mounts, and TaskCard here.
+  const pluginHost = createPluginHost((err) => {
+    error = `Plugin hook error: ${err instanceof Error ? err.message : String(err)}`;
+  });
 
   let adapter: VaultAdapter | null = null;
   let autosaver: Autosaver | null = null;
@@ -758,10 +767,17 @@
       },
       enabled: Boolean(loaded),
     })),
+    // Plugin-contributed commands (namespaced + bound by the host). Disabled
+    // wholesale until a vault is open so they don't fire without context.
+    ...pluginHost.commands.map((c) => ({ ...c, enabled: c.enabled !== false && Boolean(loaded) })),
   ]);
 
-  // Effective shortcut bindings (built-in defaults + user overrides).
-  const shortcutMap = $derived(resolveShortcuts(settings.shortcuts));
+  // Effective shortcut bindings: built-in defaults, then plugin-declared
+  // defaults, then user overrides win (resolveShortcuts layers its own
+  // built-in defaults under whatever overrides we pass).
+  const shortcutMap = $derived(
+    resolveShortcuts({ ...pluginHost.defaultShortcuts, ...settings.shortcuts }),
+  );
 
   function isEditableTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;

@@ -1,8 +1,8 @@
 {
   "name": "@markdown-board/plugin-api",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
-  "description": "Public types and runtime contract for markdown-board plugins. Lands in Phase 4.",
+  "description": "Public types and runtime contract for markdown-board plugins.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -21,7 +21,14 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@markdown-board/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5"
+  },
   "devDependencies": {
+    "svelte": "^5.2.0",
     "typescript": "^5.6.3"
   }
 }
