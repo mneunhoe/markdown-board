@@ -64,4 +64,15 @@ export const FIRST_PARTY_PLUGINS: readonly FirstPartyPlugin[] = [
     },
     load: () => import('@markdown-board/plugin-week-view'),
   },
+  {
+    manifest: {
+      id: 'ical-export',
+      name: 'iCal export',
+      version: '1.0.0',
+      entry: '',
+      minAppVersion: '1.0.0',
+      description: "Export the week's scheduled tasks as an .ics calendar file.",
+    },
+    load: () => import('@markdown-board/plugin-ical-export'),
+  },
 ];

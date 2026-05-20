@@ -27,6 +27,7 @@
   "dependencies": {
     "@markdown-board/core": "workspace:*",
     "@markdown-board/plugin-api": "workspace:*",
+    "@markdown-board/plugin-ical-export": "workspace:*",
     "@markdown-board/plugin-pomodoro": "workspace:*",
     "@markdown-board/plugin-week-view": "workspace:*",
     "@markdown-board/ui": "workspace:*",
