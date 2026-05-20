@@ -18,7 +18,15 @@ import type {
   WatchHandler,
 } from '@markdown-board/core';
 import { FileNotFoundError } from '@markdown-board/core';
-import { exists, mkdir, readDir, readTextFile, stat, writeTextFile } from '@tauri-apps/plugin-fs';
+import {
+  exists,
+  mkdir,
+  readDir,
+  readFile,
+  readTextFile,
+  stat,
+  writeTextFile,
+} from '@tauri-apps/plugin-fs';
 
 interface TauriWatcher {
   path: string;
@@ -46,6 +54,11 @@ export class TauriFileAdapter implements FileAdapter {
    *   `watchPath`.
    */
   constructor(readonly rootPath: string) {}
+
+  /** Absolute path of the vault root, shown read-only in Settings. */
+  get displayPath(): string {
+    return this.rootPath;
+  }
 
   async readFile(path: string): Promise<string> {
     const p = normalisePath(path);
@@ -77,6 +90,23 @@ export class TauriFileAdapter implements FileAdapter {
       throw err;
     }
     return info.mtime ? info.mtime.getTime() : 0;
+  }
+
+  /**
+   * Read a file as raw bytes. Used by the custom-theme loader for binary
+   * assets (fonts, logo images). Same role/contract as
+   * `FSAFileAdapter.readBinary`; FileAdapter extension.
+   */
+  async readBinary(path: string): Promise<Uint8Array> {
+    const p = normalisePath(path);
+    if (p === '') throw new FileNotFoundError(p);
+    const abs = this.absolutise(p);
+    try {
+      return await readFile(abs);
+    } catch (err) {
+      if (!(await exists(abs))) throw new FileNotFoundError(p);
+      throw err;
+    }
   }
 
   async writeFile(path: string, contents: string): Promise<void> {

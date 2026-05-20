@@ -9,15 +9,28 @@ import type {
   VaultAdapter,
   VaultPlatform,
   VaultWatcher,
+  WatcherDeps,
 } from '../src/lib/platform.js';
 
-// A VaultAdapter is a core FileAdapter + getMtime. InMemoryAdapter covers
-// the FileAdapter surface; the shell only needs a monotonic getMtime for
-// the watcher baseline, so a counter suffices.
+// A VaultAdapter is a core FileAdapter + getMtime. InMemoryAdapter covers the
+// FileAdapter surface; getMtime returns a write-stable counter (bumped only on
+// write / externalWrite) so it mirrors real fs mtime — required by the
+// conflict guard which compares the on-disk mtime against the last synced one.
 class TestVaultAdapter extends InMemoryAdapter implements VaultAdapter {
-  private clock = 1;
+  private mtime = 1;
+  override async writeFile(path: string, contents: string): Promise<void> {
+    await super.writeFile(path, contents);
+    this.mtime += 1;
+  }
+  override externalWrite(path: string, contents: string): void {
+    super.externalWrite(path, contents);
+    this.mtime += 1;
+  }
   getMtime(): Promise<number> {
-    return Promise.resolve(this.clock++);
+    return Promise.resolve(this.mtime);
+  }
+  async readBinary(path: string): Promise<Uint8Array> {
+    return new TextEncoder().encode(await this.readFile(path));
   }
 }
 
@@ -74,6 +87,177 @@ describe('VaultApp (shell, injected platform)', () => {
     expect(container.querySelector('[data-active="board"]')).toBeTruthy();
     expect(container.textContent).toContain('Wire the desktop shell');
     expect(container.querySelector('[data-testid="reopen-vault"]')).toBeTruthy();
+  });
+
+  it('opens the command palette on Cmd-K and switches view via a command', async () => {
+    const adapter = new TestVaultAdapter({ 'TASKS.md': '## Active\n- [ ] A task\n' });
+    const { container } = render(VaultApp, { props: { platform: makeFakePlatform(adapter) } });
+    await fireEvent.click(
+      container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+    );
+    await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+
+    // No palette until the shortcut fires.
+    expect(container.querySelector('[data-testid="palette-input"]')).toBeNull();
+    await fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    const input = container.querySelector<HTMLInputElement>('[data-testid="palette-input"]');
+    expect(input).toBeTruthy();
+
+    // Filter to the "Go to List" command and run it.
+    await fireEvent.input(input!, { target: { value: 'go to list' } });
+    const item = container.querySelector<HTMLButtonElement>('[data-testid="palette-item"]');
+    expect(item?.textContent).toContain('Go to List');
+    await fireEvent.click(item!);
+    await waitFor(() => expect(container.querySelector('[data-active="list"]')).toBeTruthy());
+    // Palette closes after running a command.
+    expect(container.querySelector('[data-testid="palette-input"]')).toBeNull();
+  });
+
+  it('switches view via a default keyboard shortcut (Mod+2 → List)', async () => {
+    const adapter = new TestVaultAdapter({ 'TASKS.md': '## Active\n- [ ] A task\n' });
+    const { container } = render(VaultApp, { props: { platform: makeFakePlatform(adapter) } });
+    await fireEvent.click(
+      container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+    );
+    await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+    await fireEvent.keyDown(window, { key: '2', metaKey: true });
+    await waitFor(() => expect(container.querySelector('[data-active="list"]')).toBeTruthy());
+  });
+
+  it('searches the vault and jumps to a task (opens its editor)', async () => {
+    const adapter = new TestVaultAdapter({
+      'TASKS.md': '## Active\n- [ ] Wire the desktop shell\n- [ ] Something else\n',
+    });
+    const { container } = render(VaultApp, { props: { platform: makeFakePlatform(adapter) } });
+    await fireEvent.click(
+      container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+    );
+    await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+
+    // Open search via its shortcut, query, and jump to the first result.
+    await fireEvent.keyDown(window, { key: 'F', metaKey: true, shiftKey: true });
+    const input = container.querySelector<HTMLInputElement>('[data-testid="search-input"]');
+    expect(input).toBeTruthy();
+    await fireEvent.input(input!, { target: { value: 'desktop' } });
+    const item = container.querySelector<HTMLButtonElement>('[data-testid="search-item"]');
+    expect(item?.textContent).toContain('Wire the desktop shell');
+    await fireEvent.click(item!);
+    // Jump closes search and opens the full task editor for that task.
+    await waitFor(() => expect(container.querySelector('[data-testid="search-input"]')).toBeNull());
+    await waitFor(() => {
+      const titleInput = container.querySelector<HTMLInputElement>(
+        '[data-testid="task-edit-title"]',
+      );
+      expect(titleInput?.value).toBe('Wire the desktop shell');
+    });
+  });
+
+  it('honours a user shortcut override from settings', async () => {
+    localStorage.setItem(
+      'markdown-board:settings',
+      JSON.stringify({ shortcuts: { 'go-overview': 'Mod+9' } }),
+    );
+    const adapter = new TestVaultAdapter({ 'TASKS.md': '## Active\n- [ ] A task\n' });
+    const { container } = render(VaultApp, { props: { platform: makeFakePlatform(adapter) } });
+    await fireEvent.click(
+      container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+    );
+    await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+    await fireEvent.keyDown(window, { key: '9', metaKey: true });
+    await waitFor(() => expect(container.querySelector('[data-active="overview"]')).toBeTruthy());
+  });
+
+  it('quick-adds a task via the shortcut and writes it to TASKS.md', async () => {
+    const adapter = new TestVaultAdapter({ 'TASKS.md': '## Active\n- [ ] Existing\n' });
+    const { container } = render(VaultApp, { props: { platform: makeFakePlatform(adapter) } });
+    await fireEvent.click(
+      container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+    );
+    await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+
+    await fireEvent.keyDown(window, { key: 'N', metaKey: true, shiftKey: true });
+    const input = container.querySelector<HTMLInputElement>('[data-testid="quick-add-title"]');
+    expect(input).toBeTruthy();
+    await fireEvent.input(input!, { target: { value: 'Freshly added' } });
+    await fireEvent.click(container.querySelector('[data-testid="quick-add-confirm"]')!);
+
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="quick-add-title"]')).toBeNull(),
+    );
+    await waitFor(() => expect(container.textContent).toContain('Freshly added'));
+    await waitFor(async () =>
+      expect(await adapter.readFile('TASKS.md')).toContain('Freshly added'),
+    );
+  });
+
+  it('switching the grammar profile re-saves TASKS.md in the new format', async () => {
+    const adapter = new TestVaultAdapter({
+      'TASKS.md': '## Active\n- [ ] **[P1] High task** <!-- id:h1 -->\n',
+    });
+    const { container } = render(VaultApp, { props: { platform: makeFakePlatform(adapter) } });
+    await fireEvent.click(
+      container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+    );
+    await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+
+    // Switch the profile via the settings select.
+    await fireEvent.click(
+      container.querySelector<HTMLButtonElement>('[data-testid="open-settings"]')!,
+    );
+    const select = container.querySelector<HTMLSelectElement>('[data-testid="grammar-profile"]')!;
+    await fireEvent.change(select, { target: { value: 'obsidian-tasks' } });
+
+    // The autosave effect re-serialises in the new profile and writes it.
+    await waitFor(async () => {
+      const written = await adapter.readFile('TASKS.md');
+      expect(written).toContain('⏫ High task');
+      expect(written).not.toContain('[P1]');
+    });
+  });
+
+  it('opens a conflict modal when an external edit collides with local edits', async () => {
+    const adapter = new TestVaultAdapter({ 'TASKS.md': '## Active\n- [ ] Original\n' });
+    let deps: WatcherDeps | undefined;
+    const platform = makeFakePlatform(adapter, {
+      createWatcher: (_a, d) => {
+        deps = d;
+        return noopWatcher;
+      },
+    });
+    const { container } = render(VaultApp, { props: { platform } });
+    await fireEvent.click(
+      container.querySelector<HTMLButtonElement>('[data-testid="pick-vault"]')!,
+    );
+    await waitFor(() => expect(container.querySelector('.tab-bar')).toBeTruthy());
+
+    // Unsaved local edit (autosave is debounced and won't fire during the test).
+    await fireEvent.keyDown(window, { key: 'N', metaKey: true, shiftKey: true });
+    await fireEvent.input(container.querySelector('[data-testid="quick-add-title"]')!, {
+      target: { value: 'Local edit' },
+    });
+    await fireEvent.click(container.querySelector('[data-testid="quick-add-confirm"]')!);
+
+    // The file changes out-of-band, then the watcher reports it.
+    adapter.externalWrite('TASKS.md', '## Active\n- [ ] External change\n');
+    await deps!.onExternalChange();
+
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="conflict-mine"]')).toBeTruthy(),
+    );
+    expect(container.querySelector('[data-testid="conflict-mine"]')?.textContent).toContain(
+      'Local edit',
+    );
+    expect(container.querySelector('[data-testid="conflict-theirs"]')?.textContent).toContain(
+      'External change',
+    );
+
+    // Take theirs → the modal closes and the board shows the on-disk version.
+    await fireEvent.click(container.querySelector('[data-testid="conflict-take-theirs"]')!);
+    await waitFor(() =>
+      expect(container.querySelector('[data-testid="conflict-mine"]')).toBeNull(),
+    );
+    await waitFor(() => expect(container.textContent).toContain('External change'));
+    expect(await adapter.readFile('TASKS.md')).toContain('External change');
   });
 
   it('stays on the empty state when the picker resolves null (cancelled)', async () => {

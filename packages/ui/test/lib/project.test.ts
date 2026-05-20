@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { projectShort, projectColor } from '../../src/lib/project.js';
+import { projectShort, projectColor, projectColorHex } from '../../src/lib/project.js';
 
 describe('projectShort', () => {
   it('returns null for null / undefined / empty', () => {
@@ -46,5 +46,31 @@ describe('projectColor', () => {
 
   it('keeps the short form and the full tag visually distinct', () => {
     expect(projectColor('PSD_GAN')).not.toBe(projectColor('PSD_GAN — extra'));
+  });
+
+  it('returns an override colour when one is set for the name', () => {
+    expect(projectColor('PSD_GAN', { PSD_GAN: '#ff0000' })).toBe('#ff0000');
+  });
+
+  it('falls back to the hash when the override map lacks the name', () => {
+    expect(projectColor('PSD_GAN', { Other: '#ff0000' })).toBe(projectColor('PSD_GAN'));
+  });
+});
+
+describe('projectColorHex', () => {
+  it('returns a hex override verbatim', () => {
+    expect(projectColorHex('PSD_GAN', { PSD_GAN: '#abcdef' })).toBe('#abcdef');
+  });
+
+  it('returns a deterministic #rrggbb for the hashed default', () => {
+    const hex = projectColorHex('PSD_GAN');
+    expect(hex).toMatch(/^#[0-9a-f]{6}$/);
+    expect(projectColorHex('PSD_GAN')).toBe(hex);
+  });
+
+  it('ignores a non-hex override and uses the hashed default', () => {
+    expect(projectColorHex('PSD_GAN', { PSD_GAN: 'hsl(1,2%,3%)' })).toBe(
+      projectColorHex('PSD_GAN'),
+    );
   });
 });

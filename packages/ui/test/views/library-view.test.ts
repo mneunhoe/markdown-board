@@ -111,6 +111,55 @@ describe('LibraryView', () => {
     expect(cells).toEqual(['Marcel', 'Owner', 'Alex', 'Reviewer']);
   });
 
+  it('renders a resolved [[wiki-link]] as a clickable button', () => {
+    const { container } = render(LibraryView, {
+      docs: [
+        makeDoc({ title: 'Alpha', sections: { Notes: 'see [[Beta]] now' } }),
+        makeDoc({ title: 'Beta' }),
+      ],
+    });
+    const link = container.querySelector<HTMLButtonElement>('[data-testid="wikilink"]');
+    expect(link?.getAttribute('data-target')).toBe('Beta');
+    expect(link?.textContent?.trim()).toBe('Beta');
+  });
+
+  it('uses the alias label for [[Target|alias]] links', () => {
+    const { container } = render(LibraryView, {
+      docs: [
+        makeDoc({ title: 'Alpha', sections: { Notes: '[[Beta|the beta]]' } }),
+        makeDoc({ title: 'Beta' }),
+      ],
+    });
+    const link = container.querySelector<HTMLButtonElement>('[data-testid="wikilink"]');
+    expect(link?.getAttribute('data-target')).toBe('Beta');
+    expect(link?.textContent?.trim()).toBe('the beta');
+  });
+
+  it('renders an unresolved link as dimmed, non-clickable text', () => {
+    const { container } = render(LibraryView, {
+      docs: [makeDoc({ title: 'Alpha', sections: { Notes: 'see [[Ghost]]' } })],
+    });
+    expect(container.querySelector('[data-testid="wikilink"]')).toBeNull();
+    expect(
+      container.querySelector('[data-testid="wikilink-unresolved"]')?.textContent?.trim(),
+    ).toBe('Ghost');
+  });
+
+  it('shows a backlinks panel listing docs that link here', () => {
+    const { container } = render(LibraryView, {
+      docs: [
+        makeDoc({ title: 'Alpha', path: 'library/alpha.md', rawContent: 'see [[Beta]]' }),
+        makeDoc({ title: 'Beta', path: 'library/beta.md', rawContent: 'standalone' }),
+      ],
+    });
+    const panel = container.querySelector('[data-testid="backlinks"]');
+    expect(panel).toBeTruthy();
+    const links = [...container.querySelectorAll('[data-testid="backlink"]')].map((n) =>
+      n.textContent?.trim(),
+    );
+    expect(links).toEqual(['Alpha']);
+  });
+
   it('renders EmptyState when there are no docs', () => {
     const { container } = render(LibraryView, { docs: [] });
     expect(container.querySelector('.empty-state')).not.toBeNull();

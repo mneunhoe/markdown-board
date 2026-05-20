@@ -1,5 +1,12 @@
 <script lang="ts">
-  import type { LibraryDoc } from '@markdown-board/core';
+  import {
+    buildBacklinks,
+    buildLinkLookup,
+    docKey,
+    resolveWikiLink,
+    splitByWikiLinks,
+    type LibraryDoc,
+  } from '@markdown-board/core';
   import EmptyState from '../components/EmptyState.svelte';
 
   interface Props {
@@ -26,15 +33,42 @@
   const hasDocs = $derived(docs.length > 0);
   const editable = $derived(onEdit !== undefined);
 
+  // Wiki-link plumbing: a name→doc lookup (to know which `[[links]]` resolve)
+  // and a backlink index (which docs link *to* each doc), both keyed by docKey.
+  const lookup = $derived(buildLinkLookup(docs));
+  const backlinks = $derived(buildBacklinks(docs));
+
   function nonIntroSections(doc: LibraryDoc): Array<[string, string]> {
     return Object.entries(doc.sections).filter(([name, content]) => name !== '_intro' && content);
+  }
+
+  /** DOM id for a doc's article, derived from its stable docKey. */
+  function idForKey(key: string): string {
+    return `lib-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+  }
+
+  function scrollToKey(key: string): void {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById(idForKey(key));
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function onWikiLink(target: string): void {
+    const doc = resolveWikiLink(target, lookup);
+    if (doc) scrollToKey(docKey(doc));
+  }
+
+  function linkResolves(target: string): boolean {
+    return resolveWikiLink(target, lookup) !== null;
   }
 </script>
 
 {#if hasDocs}
   <div class="library-view">
     {#each docs as doc (doc.title || doc.rawContent.slice(0, 40))}
-      <article class="library-doc">
+      <article class="library-doc" id={idForKey(docKey(doc))}>
         <header class="library-doc-header">
           <h2 class="library-doc-title">{doc.title || 'Untitled'}</h2>
           {#if editable}
@@ -63,7 +97,16 @@
         {#each nonIntroSections(doc) as [name, content] (name)}
           <section class="library-section">
             <h3 class="library-section-title">{name}</h3>
-            <pre class="library-section-content">{content}</pre>
+            <pre
+              class="library-section-content">{#each splitByWikiLinks(content) as seg, i (i)}{#if seg.kind === 'text'}{seg.text}{:else if linkResolves(seg.target)}<button
+                    type="button"
+                    class="wikilink"
+                    data-testid="wikilink"
+                    data-target={seg.target}
+                    onclick={() => onWikiLink(seg.target)}>{seg.label}</button
+                  >{:else}<span class="wikilink unresolved" data-testid="wikilink-unresolved"
+                    >{seg.label}</span
+                  >{/if}{/each}</pre>
           </section>
         {/each}
 
@@ -87,6 +130,24 @@
             </tbody>
           </table>
         {/each}
+
+        {#if (backlinks.get(docKey(doc)) ?? []).length > 0}
+          <section class="library-backlinks" data-testid="backlinks">
+            <h3 class="library-section-title">Linked from</h3>
+            <ul class="backlink-list">
+              {#each backlinks.get(docKey(doc)) ?? [] as bl (bl.fromKey)}
+                <li>
+                  <button
+                    type="button"
+                    class="wikilink"
+                    data-testid="backlink"
+                    onclick={() => scrollToKey(bl.fromKey)}>{bl.fromTitle || bl.fromPath}</button
+                  >
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/if}
       </article>
     {/each}
     {#if editable}
@@ -246,5 +307,44 @@
     font-weight: 600;
     color: var(--text-secondary);
     background: var(--bg-secondary);
+  }
+
+  .wikilink {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .wikilink:hover {
+    color: var(--accent-hover);
+  }
+
+  .wikilink.unresolved {
+    color: var(--text-muted);
+    cursor: default;
+    text-decoration: underline dotted;
+  }
+
+  .library-backlinks {
+    margin-top: 16px;
+    border-top: 1px solid var(--border-light);
+    padding-top: 12px;
+  }
+
+  .backlink-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
   }
 </style>

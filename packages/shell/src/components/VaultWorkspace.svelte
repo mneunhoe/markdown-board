@@ -61,6 +61,10 @@
     onSectionAdd?: SectionAddHandler;
     /** Slice 6j — `×` on empty section headers (Board + List). */
     onSectionDelete?: SectionDeleteHandler;
+    /** Controlled active tab (command palette / shortcuts). Omitted ⇒ internal state. */
+    active?: TabKey;
+    /** Fired on tab change when controlled. */
+    onActiveChange?: (key: TabKey) => void;
   }
 
   const {
@@ -86,9 +90,19 @@
     onTaskAdd,
     onSectionAdd,
     onSectionDelete,
+    active: activeProp,
+    onActiveChange,
   }: Props = $props();
 
-  let active = $state<TabKey>('board');
+  // Controlled when `activeProp` is supplied (VaultApp drives it via the
+  // command palette); otherwise the workspace owns the tab state internally.
+  let internalActive = $state<TabKey>('board');
+  const active = $derived(activeProp ?? internalActive);
+
+  function selectTab(key: TabKey): void {
+    if (onActiveChange) onActiveChange(key);
+    else internalActive = key;
+  }
 
   // Conditionally-keyed prop bags so an undefined handler is *absent*
   // rather than passed as `undefined` — required under
@@ -137,7 +151,7 @@
 </script>
 
 <div class="workspace">
-  <TabBar {active} onSelect={(k) => (active = k)} />
+  <TabBar {active} onSelect={selectTab} />
 
   <div class="view" role="tabpanel" data-active={active}>
     {#if active === 'board'}

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { projectShort, projectColor } from '../lib/project.js';
+  import { getContext } from 'svelte';
+  import { projectShort, projectColor, PROJECT_COLOR_OVERRIDES_KEY } from '../lib/project.js';
 
   interface Props {
     /** Full project tag exactly as it sits on `Task.project` (may include
@@ -16,8 +17,14 @@
   const { project, onEdit }: Props = $props();
   const editable = $derived(onEdit !== undefined);
 
+  // Per-project colour overrides, supplied reactively by the host shell via
+  // context. Absent in isolated tests → falls back to the hashed colour.
+  const overridesFn = getContext<(() => Record<string, string>) | undefined>(
+    PROJECT_COLOR_OVERRIDES_KEY,
+  );
+
   const short = $derived(projectShort(project));
-  const color = $derived(projectColor(short));
+  const color = $derived(projectColor(short, overridesFn?.()));
   const fullTitle = $derived(project && short && project !== short ? project : null);
 </script>
 

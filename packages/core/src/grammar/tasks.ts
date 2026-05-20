@@ -1,8 +1,16 @@
+import { getGrammarProfile, type GrammarProfile, type GrammarProfileId } from './profiles.js';
 import type { Day, Priority, Section, Subtask, Task, Vault } from './types.js';
 import { WEEK_DAYS } from './types.js';
 
 export interface ParseTasksOptions {
   assignMissingIds?: boolean;
+  /** Token encoding to read. Defaults to `default` (bold-prefix brackets). */
+  profile?: GrammarProfileId | undefined;
+}
+
+export interface SerializeOptions {
+  /** Token encoding to write. Defaults to `default` (bold-prefix brackets). */
+  profile?: GrammarProfileId | undefined;
 }
 
 const H2_RE = /^## \*{0,2}(.+?)\*{0,2}$/;
@@ -11,7 +19,6 @@ const SUBTASK_LINE_RE = /^\s+- \[([ xX])\]\s*(.*)$/;
 const ID_SUFFIX_RE = /\s*<!--\s*id:\s*([0-9a-f]+)\s*-->\s*$/i;
 const BOLD_WRAP_RE = /^\*\*(.+?)\*\*(.*)$/;
 
-const PRIORITY_RE = /^\s*\[\s*(P[0-3])\s*\]\s+(.+)$/i;
 const PROJECT_RE = /^\s*\[\s*project:\s*([^\]]+?)\s*\]\s+(.+)$/i;
 const DAY_RE =
   /^\s*\[\s*(mon(?:day)?|tue(?:s|sday)?|wed(?:s|nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\s*\]\s+(.+)$/i;
@@ -38,20 +45,6 @@ export function slugifySection(name: string): string {
     .replace(/^-|-$/g, '');
 }
 
-function priorityFromToken(token: string): Priority {
-  switch (token.toUpperCase()) {
-    case 'P0':
-      return 'blocker';
-    case 'P1':
-      return 'high';
-    case 'P3':
-      return 'low';
-    case 'P2':
-    default:
-      return null;
-  }
-}
-
 function normaliseDay(raw: string): Day | null {
   const head = raw.slice(0, 3).toLowerCase();
   const canonical = WEEK_DAYS.find((d) => d.toLowerCase() === head);
@@ -66,7 +59,7 @@ interface TokenState {
   pomodoros: number;
 }
 
-function peelTokens(title: string): { title: string; tokens: TokenState } {
+function peelTokens(title: string, profile: GrammarProfile): { title: string; tokens: TokenState } {
   const state: TokenState = {
     priority: null,
     prioritySet: false,
@@ -81,11 +74,11 @@ function peelTokens(title: string): { title: string; tokens: TokenState } {
     progress = false;
 
     if (!state.prioritySet) {
-      const m = PRIORITY_RE.exec(remaining);
+      const m = profile.priority.peel(remaining);
       if (m) {
-        state.priority = priorityFromToken(m[1]!);
+        state.priority = m.priority;
         state.prioritySet = true;
-        remaining = m[2]!;
+        remaining = m.rest;
         progress = true;
         continue;
       }
@@ -128,7 +121,7 @@ function peelTokens(title: string): { title: string; tokens: TokenState } {
   return { title: remaining.trim(), tokens: state };
 }
 
-function parseTaskBody(body: string, checked: boolean): Task {
+function parseTaskBody(body: string, checked: boolean, profile: GrammarProfile): Task {
   let working = body;
   let id = '';
 
@@ -151,7 +144,7 @@ function parseTaskBody(body: string, checked: boolean): Task {
 
   const rawNote = noteRaw.replace(/^\s*-\s*/, '').trim();
   const { resolution, note } = peelResolution(rawNote);
-  const { title, tokens } = peelTokens(titleRaw);
+  const { title, tokens } = peelTokens(titleRaw, profile);
 
   return {
     id,
@@ -177,7 +170,8 @@ function parseSubtask(body: string, checked: boolean): Subtask {
   return { text: body.trim(), checked };
 }
 
-export function parseTasks(input: string, _options: ParseTasksOptions = {}): Vault {
+export function parseTasks(input: string, options: ParseTasksOptions = {}): Vault {
+  const profile = getGrammarProfile(options.profile);
   const lines = input.split(/\r?\n/);
   const sections: Section[] = [];
   const preludeLines: string[] = [];
@@ -212,7 +206,7 @@ export function parseTasks(input: string, _options: ParseTasksOptions = {}): Vau
     const taskMatch = TASK_LINE_RE.exec(line);
     if (taskMatch && currentSection) {
       const checked = taskMatch[1]!.toLowerCase() === 'x';
-      const task = parseTaskBody(taskMatch[2]!, checked);
+      const task = parseTaskBody(taskMatch[2]!, checked, profile);
       currentSection.tasks.push(task);
       currentTask = task;
       continue;
@@ -233,33 +227,19 @@ export function parseTasks(input: string, _options: ParseTasksOptions = {}): Vau
   };
 }
 
-function priorityToToken(priority: Priority): string | null {
-  switch (priority) {
-    case 'blocker':
-      return 'P0';
-    case 'high':
-      return 'P1';
-    case 'low':
-      return 'P3';
-    case null:
-    default:
-      return null;
-  }
-}
-
-function emitTokens(task: Task): string {
+function emitTokens(task: Task, profile: GrammarProfile): string {
   const parts: string[] = [];
-  const p = priorityToToken(task.priority);
-  if (p) parts.push(`[${p}]`);
+  const p = profile.priority.emit(task.priority);
+  if (p) parts.push(p);
   if (task.project) parts.push(`[project:${task.project}]`);
   if (task.day) parts.push(`[${task.day}]`);
   if (task.pomodoros > 0) parts.push(`[pom:${task.pomodoros}]`);
   return parts.length > 0 ? parts.join(' ') + ' ' : '';
 }
 
-function emitTask(task: Task): string {
+function emitTask(task: Task, profile: GrammarProfile): string {
   const checkbox = task.checked ? '[x]' : '[ ]';
-  const titleBody = `${emitTokens(task)}${task.title}`;
+  const titleBody = `${emitTokens(task, profile)}${task.title}`;
   const note = formatNoteSuffix(task);
   const idSuffix = task.id ? ` <!-- id:${task.id} -->` : '';
   let out = `- ${checkbox} **${titleBody}**${note}${idSuffix}\n`;
@@ -295,19 +275,20 @@ function formatNoteSuffix(task: Task): string {
  * tasks). Subtask lines must follow the canonical two-space indent
  * documented in §3.10.
  */
-export function emitTaskBlock(task: Task): string {
-  return emitTask(task).trimEnd();
+export function emitTaskBlock(task: Task, options: SerializeOptions = {}): string {
+  return emitTask(task, getGrammarProfile(options.profile)).trimEnd();
 }
 
-export function parseTaskBlock(raw: string): Task | null {
+export function parseTaskBlock(raw: string, options: ParseTasksOptions = {}): Task | null {
   const wrapped = `## __mb_tmp__\n${raw.replace(/\r\n?/g, '\n')}\n`;
-  const vault = parseTasks(wrapped);
+  const vault = parseTasks(wrapped, options);
   const section = vault.sections[0];
   if (!section || section.tasks.length !== 1) return null;
   return section.tasks[0] ?? null;
 }
 
-export function toMarkdown(vault: Vault): string {
+export function toMarkdown(vault: Vault, options: SerializeOptions = {}): string {
+  const profile = getGrammarProfile(options.profile);
   let out = '';
   if (vault.prelude) {
     out += `${vault.prelude}\n\n`;
@@ -317,7 +298,7 @@ export function toMarkdown(vault: Vault): string {
     const section = vault.sections[i]!;
     out += `## ${section.name}\n`;
     for (const task of section.tasks) {
-      out += emitTask(task);
+      out += emitTask(task, profile);
     }
   }
   return out ? `${out.trimEnd()}\n` : '';

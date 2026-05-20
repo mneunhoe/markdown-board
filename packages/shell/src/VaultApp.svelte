@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { setContext } from 'svelte';
   import { toMarkdown } from '@markdown-board/core';
   import type { Day, Section, Task } from '@markdown-board/core';
   import {
     EmptyState,
+    PROJECT_COLOR_OVERRIDES_KEY,
+    projectShort,
     type ArchivedTaskRef,
     type ColumnMoveHandler,
     type DayEditOpenHandler,
@@ -24,14 +27,39 @@
     type TaskUnresolveHandler,
     type TitleEditHandler,
   } from '@markdown-board/ui';
+  import CommandPalette from './components/CommandPalette.svelte';
+  import ConflictModal from './components/ConflictModal.svelte';
   import DayPickerModal from './components/DayPickerModal.svelte';
   import LibraryEditorModal from './components/LibraryEditorModal.svelte';
   import ProjectPickerModal from './components/ProjectPickerModal.svelte';
+  import QuickAddModal from './components/QuickAddModal.svelte';
   import ResolveModal from './components/ResolveModal.svelte';
+  import SearchModal from './components/SearchModal.svelte';
   import SettingsModal from './components/SettingsModal.svelte';
   import TaskEditModal from './components/TaskEditModal.svelte';
   import VaultWorkspace from './components/VaultWorkspace.svelte';
+  import { type Command } from './lib/commands.js';
+  import {
+    buildSearchDocs,
+    createSearchIndex,
+    runSearch,
+    type SearchDoc,
+    type SearchResult,
+  } from './lib/search.js';
   import { applyTheme, loadSettings, saveSettings, type Settings } from './lib/settings.js';
+  import {
+    comboFromEvent,
+    commandForCombo,
+    comboHasCommandModifier,
+    resolveShortcuts,
+  } from './lib/shortcuts.js';
+  import { TABS, type TabKey } from './lib/tabs.js';
+  import {
+    clearVaultTheme,
+    loadVaultTheme,
+    watchVaultTheme,
+    type ThemeStatus,
+  } from './lib/theme/index.js';
   import type {
     ExternalOpenEvent,
     RecentVault,
@@ -87,6 +115,14 @@
   let resolving = $state(false);
   let settings = $state<Settings>(loadSettings());
   let settingsOpen = $state(false);
+  let paletteOpen = $state(false);
+  let searchOpen = $state(false);
+  let quickAddOpen = $state(false);
+  // Set when an external edit to TASKS.md collides with unsaved local changes.
+  // `base` = what we last wrote, `mine` = current in-memory, `theirs` = on disk.
+  let conflict = $state<{ base: string; mine: string; theirs: string } | null>(null);
+  // Active workspace tab, lifted here so the command palette can switch views.
+  let activeTab = $state<TabKey>('board');
   // Slice 6b picker state. A non-null `target` opens the corresponding
   // modal. The target is captured at open-time so a concurrent external
   // reload can't shift the picker between picks.
@@ -100,9 +136,23 @@
   // reload can't shift the form data.
   let taskEditor = $state<{ target: EditTarget; snapshot: Task } | null>(null);
 
+  // Custom-theme (theme.yaml) state. The logo is markup (rendered in the
+  // header); the palette/fonts are injected as CSS by the loader. Status
+  // surfaces parse/asset problems to the Settings UI.
+  let themeLogoUrl = $state<string | null>(null);
+  let themeStatus = $state<ThemeStatus>({ state: 'none', errors: [] });
+  let vaultPath = $state<string | null>(null);
+
   let adapter: VaultAdapter | null = null;
   let autosaver: Autosaver | null = null;
   let watcher: VaultWatcher | null = null;
+  let themeWatcherDispose: (() => void) | null = null;
+  // Search index, rebuilt each time the search modal opens (cheap; keeps the
+  // index in sync with the latest vault without re-indexing on every edit).
+  let searchIndex: ReturnType<typeof createSearchIndex> | null = null;
+  // mtime of TASKS.md as of our last successful read/write — used to detect
+  // out-of-band edits before an autosave would clobber them.
+  let lastSyncedMtime = 0;
 
   const supported = $derived(platform.isSupported());
 
@@ -180,17 +230,27 @@
   async function mountVault(next: VaultAdapter): Promise<void> {
     teardownIo();
     adapter = next;
-    const fresh = await loadVault(next);
-    const canonical = toMarkdown(fresh.vault);
+    vaultPath = next.displayPath ?? null;
+    const fresh = await loadVault(next, grammarProfile);
+    const canonical = serialize(fresh.vault);
     lastWrittenMd = canonical;
     loaded = fresh;
     const initialMtime = await safeMtime(next, TASKS_PATH);
+    lastSyncedMtime = initialMtime;
     autosaver = new Autosaver({
+      debounceMs: settings.autosaveDelayMs,
       write: async (md) => {
+        // Guard against clobbering: if the file changed on disk since we last
+        // synced, surface a conflict instead of overwriting the other edit.
+        const current = await safeMtime(next, TASKS_PATH);
+        if (lastSyncedMtime !== 0 && current !== lastSyncedMtime) {
+          conflict = { base: lastWrittenMd, mine: md, theirs: await readTasks(next) };
+          return;
+        }
         await next.writeFile(TASKS_PATH, md);
         lastWrittenMd = md;
-        const mtime = await safeMtime(next, TASKS_PATH);
-        watcher?.setBaseline(mtime);
+        lastSyncedMtime = await safeMtime(next, TASKS_PATH);
+        watcher?.setBaseline(lastSyncedMtime);
       },
       onError: (err: unknown) => {
         error = `Autosave failed: ${err instanceof Error ? err.message : String(err)}`;
@@ -201,11 +261,20 @@
       initialMtime,
       isLocalWritePending: () => autosaver?.isPending ?? false,
       onExternalChange: async () => {
-        if (!adapter || autosaver?.isPending) return;
-        const reloaded = await loadVault(adapter);
-        lastWrittenMd = toMarkdown(reloaded.vault);
+        if (!adapter || conflict) return;
+        const theirs = await readTasks(adapter);
+        const mine = loaded ? serialize(loaded.vault) : lastWrittenMd;
+        if (mine !== lastWrittenMd && theirs !== lastWrittenMd && theirs !== mine) {
+          // Local edits AND the disk diverged from our baseline → conflict.
+          conflict = { base: lastWrittenMd, mine, theirs };
+          return;
+        }
+        // No local divergence (or already converged) → adopt the disk copy.
+        const reloaded = await loadVault(adapter, grammarProfile);
+        lastWrittenMd = serialize(reloaded.vault);
         loaded = reloaded;
-        watcher?.setBaseline(await safeMtime(adapter, TASKS_PATH));
+        lastSyncedMtime = await safeMtime(adapter, TASKS_PATH);
+        watcher?.setBaseline(lastSyncedMtime);
       },
       onError: () => {
         // Transient mtime failures (file briefly missing during external
@@ -213,17 +282,40 @@
       },
     });
     await watcher.start();
+    // Apply the vault's custom theme (theme.yaml) if present, and hot-reload
+    // it on external edits.
+    await applyVaultTheme();
+    themeWatcherDispose = watchVaultTheme(next, () => void applyVaultTheme());
     // The just-opened vault is now the most-recent; reflect that so the
     // empty state shows it first next time the user opens another vault.
     refreshRecents();
   }
 
+  async function applyVaultTheme(): Promise<void> {
+    if (!adapter) return;
+    try {
+      const result = await loadVaultTheme(adapter);
+      themeStatus = result.status;
+      themeLogoUrl = result.logoUrl;
+    } catch (err) {
+      themeStatus = { state: 'error', errors: [err instanceof Error ? err.message : String(err)] };
+    }
+  }
+
   function teardownIo(): void {
     autosaver?.dispose();
     watcher?.dispose();
+    themeWatcherDispose?.();
+    clearVaultTheme();
     autosaver = null;
     watcher = null;
+    themeWatcherDispose = null;
     adapter = null;
+    themeLogoUrl = null;
+    themeStatus = { state: 'none', errors: [] };
+    vaultPath = null;
+    conflict = null;
+    lastSyncedMtime = 0;
   }
 
   async function safeMtime(a: VaultAdapter, path: string): Promise<number> {
@@ -232,6 +324,41 @@
     } catch {
       return 0;
     }
+  }
+
+  async function readTasks(a: VaultAdapter): Promise<string> {
+    try {
+      return await a.readFile(TASKS_PATH);
+    } catch {
+      return '';
+    }
+  }
+
+  // Conflict resolution: rewrite TASKS.md with the chosen content, then reload
+  // from disk so the in-memory vault matches what's persisted.
+  async function resolveConflictWith(content: string): Promise<void> {
+    if (!adapter) return;
+    try {
+      await adapter.writeFile(TASKS_PATH, content);
+      const reloaded = await loadVault(adapter, grammarProfile);
+      loaded = reloaded;
+      lastWrittenMd = serialize(reloaded.vault);
+      lastSyncedMtime = await safeMtime(adapter, TASKS_PATH);
+      watcher?.setBaseline(lastSyncedMtime);
+      conflict = null;
+    } catch (err) {
+      error = `Could not resolve conflict: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  function keepMine(): void {
+    if (conflict) void resolveConflictWith(conflict.mine);
+  }
+  function takeTheirs(): void {
+    if (conflict) void resolveConflictWith(conflict.theirs);
+  }
+  function applyMerge(merged: string): void {
+    void resolveConflictWith(merged);
   }
 
   const onTaskMove: TaskMoveHandler = (move) => {
@@ -420,6 +547,17 @@
 
   const projectSuggestions = $derived(loaded ? allProjects(loaded.vault) : []);
 
+  // Distinct short project names — the keys colour overrides are stored under
+  // (ProjectPill colours by short name) and the rows shown in Settings.
+  const projectColorTargets = $derived(
+    Array.from(
+      new Set(projectSuggestions.map((p) => projectShort(p)).filter((s): s is string => !!s)),
+    ),
+  );
+
+  // Make project-colour overrides reactively available to ProjectPill.
+  setContext(PROJECT_COLOR_OVERRIDES_KEY, () => settings.projectColorOverrides);
+
   // Slice 6g-3 — group archive entries by source-section name and map
   // to the matching active section's id. Orphans (source section
   // missing from the active vault) fall back to the first section so
@@ -455,13 +593,13 @@
 
   async function refreshArchive(): Promise<void> {
     if (!adapter || !loaded) return;
-    loaded.archive = await loadArchive(adapter);
+    loaded.archive = await loadArchive(adapter, grammarProfile);
   }
 
   const onTaskUnresolve: TaskUnresolveHandler = async (target) => {
     if (!loaded || !adapter) return;
     try {
-      const result = await unresolveTask(adapter, loaded.vault, target.taskId);
+      const result = await unresolveTask(adapter, loaded.vault, target.taskId, grammarProfile);
       if (!result.ok) {
         if (result.reason === 'archive-missing') {
           error = 'No archive file to unresolve from.';
@@ -494,7 +632,7 @@
       // Flush any pending autosave first so the archive entry mirrors what's
       // about to be on disk in TASKS.md.
       await autosaver?.flush();
-      await appendArchiveEntry(adapter, task, resolution, section);
+      await appendArchiveEntry(adapter, task, resolution, section, { profile: grammarProfile });
       removeTask(loaded.vault, { taskId: task.id, sectionId: section.id });
       // Refresh the in-memory archive Vault so the Archived expander
       // under the source column updates in the same render frame.
@@ -518,6 +656,146 @@
     applyTheme(next.theme);
   }
 
+  function toggleTheme(): void {
+    handleSettingsChange({ ...settings, theme: settings.theme === 'dark' ? 'light' : 'dark' });
+  }
+
+  // Active grammar profile + a serialize helper used everywhere TASKS.md is
+  // written, so a profile switch re-serialises the in-memory vault. Reading
+  // `settings.grammarProfile` here makes the autosave $effect re-run on switch.
+  const grammarProfile = $derived(settings.grammarProfile);
+  function serialize(v: Parameters<typeof toMarkdown>[0]): string {
+    return toMarkdown(v, { profile: grammarProfile });
+  }
+
+  function openSearch(): void {
+    if (!loaded) return;
+    const docs: SearchDoc[] = buildSearchDocs(loaded.vault, loaded.libraryDocs);
+    searchIndex = createSearchIndex(docs);
+    searchOpen = true;
+  }
+
+  function searchVault(query: string): SearchResult[] {
+    return searchIndex ? runSearch(searchIndex, query) : [];
+  }
+
+  function jumpToResult(result: SearchResult): void {
+    if (!loaded) return;
+    if (result.type === 'task' && result.sectionId && result.taskId) {
+      onFullTaskEdit({ taskId: result.taskId, sectionId: result.sectionId });
+    } else if (result.type === 'library' && result.path) {
+      openLibraryEditor(result.path);
+    }
+  }
+
+  // Commands surfaced in the palette (Cmd/Ctrl-K). Built reactively so
+  // availability tracks whether a vault is open and which platform features
+  // exist. VaultApp owns the `run` handlers; the registry stays UI-free.
+  const commands = $derived<Command[]>([
+    {
+      id: 'open-vault',
+      title: loaded ? 'Open another vault…' : 'Open vault…',
+      group: 'Vault',
+      keywords: ['folder', 'directory'],
+      run: pickAndLoad,
+      enabled: supported,
+    },
+    {
+      id: 'new-window',
+      title: 'New window',
+      group: 'Vault',
+      run: openNewWindow,
+      enabled: Boolean(platform.openNewWindow),
+    },
+    {
+      id: 'search',
+      title: 'Search tasks and library',
+      group: 'Vault',
+      keywords: ['find', 'notes'],
+      run: openSearch,
+      enabled: Boolean(loaded),
+    },
+    {
+      id: 'quick-add',
+      title: 'New task',
+      group: 'Vault',
+      keywords: ['add', 'create', 'todo'],
+      run: () => {
+        quickAddOpen = true;
+      },
+      enabled: Boolean(loaded) && (loaded?.vault.sections.length ?? 0) > 0,
+    },
+    {
+      id: 'open-settings',
+      title: 'Open settings',
+      group: 'App',
+      keywords: ['preferences', 'options'],
+      run: () => {
+        settingsOpen = true;
+      },
+    },
+    {
+      id: 'toggle-theme',
+      title: 'Toggle light / dark theme',
+      group: 'Appearance',
+      keywords: ['dark', 'light', 'mode'],
+      run: toggleTheme,
+    },
+    {
+      id: 'reload-theme',
+      title: 'Reload custom theme',
+      group: 'Appearance',
+      keywords: ['yaml', 'css'],
+      run: applyVaultTheme,
+      enabled: Boolean(loaded),
+    },
+    ...TABS.map((tab) => ({
+      id: `go-${tab.key}`,
+      title: `Go to ${tab.label}`,
+      group: 'Navigate',
+      run: () => {
+        activeTab = tab.key;
+      },
+      enabled: Boolean(loaded),
+    })),
+  ]);
+
+  // Effective shortcut bindings (built-in defaults + user overrides).
+  const shortcutMap = $derived(resolveShortcuts(settings.shortcuts));
+
+  function isEditableTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    const tag = target.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable;
+  }
+
+  function handleGlobalKeydown(event: KeyboardEvent): void {
+    const combo = comboFromEvent(event);
+    if (!combo) return;
+    const commandId = commandForCombo(combo, shortcutMap);
+    if (!commandId) return;
+    // Don't steal plain typing in a field unless the combo carries Mod/Alt.
+    if (isEditableTarget(event.target) && !comboHasCommandModifier(combo)) return;
+
+    // While an overlay is open it owns the keyboard; only the palette's own
+    // toggle (to close it) is honoured globally.
+    if (paletteOpen || searchOpen) {
+      if (paletteOpen && commandId === 'command-palette') {
+        event.preventDefault();
+        paletteOpen = false;
+      }
+      return;
+    }
+
+    event.preventDefault();
+    if (commandId === 'command-palette') {
+      paletteOpen = true;
+      return;
+    }
+    const command = commands.find((c) => c.id === commandId);
+    if (command && command.enabled !== false) void command.run();
+  }
+
   // Autosave $effect — re-runs on any deep mutation of `loaded.vault`
   // (Svelte 5's proxy traverses sections/tasks). Schedules a write when
   // the canonical markdown drifts from what we last wrote.
@@ -531,7 +809,10 @@
   // memory, but the disk file was never rewritten.
   $effect(() => {
     if (!loaded) return;
-    const md = toMarkdown(loaded.vault);
+    const md = serialize(loaded.vault);
+    // Pause autosave while a conflict is open so we don't loop on the
+    // unresolved divergence.
+    if (conflict) return;
     if (md === lastWrittenMd) return;
     autosaver?.schedule(md);
   });
@@ -553,10 +834,27 @@
   });
 </script>
 
+<svelte:window onkeydown={handleGlobalKeydown} />
+
 <main class="shell">
   <header class="topbar">
-    <h1 class="brand">markdown-board</h1>
+    <div class="brand">
+      {#if themeLogoUrl}
+        <img class="brand-logo" src={themeLogoUrl} alt="" data-testid="brand-logo" />
+      {/if}
+      <h1 class="brand-title">markdown-board</h1>
+    </div>
     <div class="topbar-actions">
+      {#if themeStatus.state === 'error'}
+        <span
+          class="theme-warning"
+          role="alert"
+          title={themeStatus.errors.join('\n')}
+          data-testid="theme-warning"
+        >
+          Theme issue
+        </span>
+      {/if}
       {#if loaded}
         <button
           type="button"
@@ -615,6 +913,8 @@
         {onTaskAdd}
         {onSectionAdd}
         {onSectionDelete}
+        active={activeTab}
+        onActiveChange={(k) => (activeTab = k)}
       />
     {:else if !supported}
       <EmptyState
@@ -670,9 +970,39 @@
     onCancel={cancelResolve}
   />
 
+  <CommandPalette open={paletteOpen} {commands} onClose={() => (paletteOpen = false)} />
+
+  <SearchModal
+    open={searchOpen}
+    search={searchVault}
+    onJump={jumpToResult}
+    onClose={() => (searchOpen = false)}
+  />
+
+  <QuickAddModal
+    open={quickAddOpen}
+    sections={loaded?.vault.sections.map((s) => ({ id: s.id, name: s.name })) ?? []}
+    onAdd={onTaskAdd}
+    onClose={() => (quickAddOpen = false)}
+  />
+
+  <ConflictModal
+    open={conflict !== null}
+    base={conflict?.base ?? ''}
+    mine={conflict?.mine ?? ''}
+    theirs={conflict?.theirs ?? ''}
+    onKeepMine={keepMine}
+    onTakeTheirs={takeTheirs}
+    onApplyMerge={applyMerge}
+  />
+
   <SettingsModal
     open={settingsOpen}
     {settings}
+    {vaultPath}
+    {themeStatus}
+    projects={projectColorTargets}
+    onReloadTheme={applyVaultTheme}
     onChange={handleSettingsChange}
     onClose={() => (settingsOpen = false)}
   />
@@ -703,6 +1033,7 @@
   <TaskEditModal
     task={taskEditor?.snapshot ?? null}
     suggestions={projectSuggestions}
+    profile={grammarProfile}
     onConfirm={confirmTaskEditor}
     onCancel={cancelTaskEditor}
   />
@@ -734,6 +1065,18 @@
   }
 
   .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .brand-logo {
+    height: 24px;
+    width: auto;
+    display: block;
+  }
+
+  .brand-title {
     margin: 0;
     font-size: 15px;
     font-weight: 600;
@@ -743,7 +1086,17 @@
 
   .topbar-actions {
     display: flex;
+    align-items: center;
     gap: 8px;
+  }
+
+  .theme-warning {
+    font-size: 12px;
+    color: var(--priority-high);
+    border: 1px solid var(--priority-high);
+    border-radius: 6px;
+    padding: 2px 8px;
+    cursor: help;
   }
 
   .topbar-action {

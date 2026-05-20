@@ -13,6 +13,19 @@ function build(files: Record<string, string> = {}): {
 }
 
 describe('FSAFileAdapter', () => {
+  describe('readBinary', () => {
+    it('returns the file contents as bytes', async () => {
+      const { adapter } = build({ 'logo.svg': '<svg/>' });
+      const bytes = await adapter.readBinary('logo.svg');
+      expect(new TextDecoder().decode(bytes)).toBe('<svg/>');
+    });
+
+    it('throws FileNotFoundError when the file is missing', async () => {
+      const { adapter } = build({});
+      await expect(adapter.readBinary('missing.woff2')).rejects.toBeInstanceOf(FileNotFoundError);
+    });
+  });
+
   describe('readFile', () => {
     it('returns the contents of an existing file', async () => {
       const { adapter } = build({ 'TASKS.md': '## Active\n' });

@@ -10,3 +10,13 @@ export type {
 } from './lib/platform.js';
 export { ExternalChangeWatcher, type ExternalChangeWatcherOptions } from './lib/vault/index.js';
 export { applyTheme, loadSettings, saveSettings, type Settings } from './lib/settings.js';
+export {
+  parseTheme,
+  compileTheme,
+  loadVaultTheme,
+  clearVaultTheme,
+  watchVaultTheme,
+  THEME_FILE,
+  type ThemeConfig,
+  type ThemeStatus,
+} from './lib/theme/index.js';

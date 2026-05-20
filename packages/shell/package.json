@@ -26,7 +26,9 @@
   },
   "dependencies": {
     "@markdown-board/core": "workspace:*",
-    "@markdown-board/ui": "workspace:*"
+    "@markdown-board/ui": "workspace:*",
+    "minisearch": "^7.1.0",
+    "yaml": "^2.6.1"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",

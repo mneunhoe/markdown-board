@@ -10,17 +10,30 @@
 export type ThemeChoice = 'light' | 'dark' | 'system';
 export const THEME_CHOICES: readonly ThemeChoice[] = ['system', 'light', 'dark'];
 
-export const GRAMMAR_PROFILES = ['default'] as const;
+export const GRAMMAR_PROFILES = ['default', 'obsidian-tasks'] as const;
 export type GrammarProfile = (typeof GRAMMAR_PROFILES)[number];
+
+/** Clamp bounds for the autosave debounce window (ms). */
+export const AUTOSAVE_DELAY_MIN = 100;
+export const AUTOSAVE_DELAY_MAX = 10_000;
 
 export interface Settings {
   theme: ThemeChoice;
   grammarProfile: GrammarProfile;
+  /** Autosave debounce window in milliseconds. */
+  autosaveDelayMs: number;
+  /** Per-project colour overrides, keyed by short project name → CSS colour. */
+  projectColorOverrides: Record<string, string>;
+  /** Keyboard-shortcut overrides, keyed by command id → combo (empty unbinds). */
+  shortcuts: Record<string, string>;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   grammarProfile: 'default',
+  autosaveDelayMs: 500,
+  projectColorOverrides: {},
+  shortcuts: {},
 };
 
 export const STORAGE_KEY = 'markdown-board:settings';
@@ -34,6 +47,9 @@ export function loadSettings(): Settings {
     return {
       theme: parseTheme(parsed.theme),
       grammarProfile: parseGrammar(parsed.grammarProfile),
+      autosaveDelayMs: parseAutosaveDelay(parsed.autosaveDelayMs),
+      projectColorOverrides: parseProjectColorOverrides(parsed.projectColorOverrides),
+      shortcuts: parseShortcuts(parsed.shortcuts),
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -93,7 +109,35 @@ function parseTheme(value: unknown): ThemeChoice {
 }
 
 function parseGrammar(value: unknown): GrammarProfile {
-  return value === 'default' ? value : DEFAULT_SETTINGS.grammarProfile;
+  return (GRAMMAR_PROFILES as readonly string[]).includes(value as string)
+    ? (value as GrammarProfile)
+    : DEFAULT_SETTINGS.grammarProfile;
+}
+
+function parseAutosaveDelay(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_SETTINGS.autosaveDelayMs;
+  }
+  return Math.min(AUTOSAVE_DELAY_MAX, Math.max(AUTOSAVE_DELAY_MIN, Math.round(value)));
+}
+
+function parseProjectColorOverrides(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const out: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof raw === 'string' && raw.trim() !== '') out[key] = raw;
+  }
+  return out;
+}
+
+function parseShortcuts(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const out: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    // Empty string is meaningful here: it unbinds a default shortcut.
+    if (typeof raw === 'string') out[key] = raw;
+  }
+  return out;
 }
 
 /** Test seam: detach the active matchMedia listener (used by tests between cases). */

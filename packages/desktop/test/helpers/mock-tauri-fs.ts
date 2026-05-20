@@ -111,6 +111,12 @@ export const fsModule = {
     return f.contents;
   },
 
+  async readFile(path: string): Promise<Uint8Array> {
+    const f = state.files.get(path);
+    if (!f) throw notFound(path);
+    return new TextEncoder().encode(f.contents);
+  },
+
   async writeTextFile(path: string, data: string): Promise<void> {
     recordFile(path, data);
   },

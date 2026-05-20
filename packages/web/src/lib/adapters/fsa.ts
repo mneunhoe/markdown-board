@@ -45,6 +45,11 @@ export class FSAFileAdapter implements FileAdapter {
 
   constructor(private readonly root: FileSystemDirectoryHandle) {}
 
+  /** Folder name of the picked vault (the FSA API doesn't expose a full path). */
+  get displayPath(): string {
+    return this.root.name;
+  }
+
   async readFile(path: string): Promise<string> {
     const p = normalisePath(path);
     const handle = await this.resolveFileHandle(p, false);
@@ -66,6 +71,19 @@ export class FSAFileAdapter implements FileAdapter {
     if (!handle) throw new FileNotFoundError(p);
     const file = await handle.getFile();
     return file.lastModified;
+  }
+
+  /**
+   * Read a file as raw bytes. Used by the custom-theme loader for binary
+   * assets (fonts, logo images). FileAdapter-extension, mirroring
+   * `getMtime` — paired with the shell's `VaultAdapter` contract.
+   */
+  async readBinary(path: string): Promise<Uint8Array> {
+    const p = normalisePath(path);
+    const handle = await this.resolveFileHandle(p, false);
+    if (!handle) throw new FileNotFoundError(p);
+    const file = await handle.getFile();
+    return new Uint8Array(await file.arrayBuffer());
   }
 
   async writeFile(path: string, contents: string): Promise<void> {

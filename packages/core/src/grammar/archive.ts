@@ -25,6 +25,7 @@
 // (old entries are silently skipped) but writers only ever emit the
 // new shape from this commit forward.
 
+import type { GrammarProfileId } from './profiles.js';
 import { emitTaskBlock, parseTaskBlock } from './tasks.js';
 import type { Section, Task } from './types.js';
 
@@ -34,6 +35,8 @@ export const ARCHIVE_HEADER =
 export interface BuildArchiveEntryOptions {
   /** Injected for deterministic tests. Defaults to `new Date()`. */
   now?: Date;
+  /** Token encoding to write. Defaults to `default`. */
+  profile?: GrammarProfileId | undefined;
 }
 
 function pad2(n: number): string {
@@ -89,7 +92,7 @@ export function buildArchiveEntry(
     })),
   };
 
-  return `\n${heading}\n\n${emitTaskBlock(resolved)}`;
+  return `\n${heading}\n\n${emitTaskBlock(resolved, { profile: options.profile })}`;
 }
 
 export function appendToArchive(existing: string, entry: string): string {
@@ -138,7 +141,11 @@ const ARCHIVE_H2_RE = /^## (?<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?: — (?<sectio
  *   (malformed entry — likely an old-format archive line that
  *   slipped through; safer to leave it in place than corrupt it)
  */
-export function removeArchivedTask(content: string, taskId: string): RemoveArchivedTaskResult {
+export function removeArchivedTask(
+  content: string,
+  taskId: string,
+  profile?: GrammarProfileId,
+): RemoveArchivedTaskResult {
   if (!taskId) return { content, removed: null };
 
   const normalized = content.replace(/\r\n?/g, '\n');
@@ -171,7 +178,7 @@ export function removeArchivedTask(content: string, taskId: string): RemoveArchi
       .slice(blockStart + 1, blockEnd)
       .join('\n')
       .replace(/^\s+|\s+$/g, '');
-    const task = parseTaskBlock(bodyText);
+    const task = parseTaskBlock(bodyText, { profile });
     if (!task) continue;
 
     const remainingLines = [...lines.slice(0, blockStart), ...lines.slice(blockEnd)];

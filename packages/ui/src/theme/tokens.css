@@ -29,6 +29,11 @@
   --accent: #d97757;
   --accent-hover: #c4684a;
 
+  /* Typography. Custom themes override these via fonts.body / fonts.mono in
+     theme.yaml; the app stylesheets resolve `font-family` through them. */
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
   /* Lines and shadows */
   --border: #e5e4df;
   --border-light: #eeeee9;

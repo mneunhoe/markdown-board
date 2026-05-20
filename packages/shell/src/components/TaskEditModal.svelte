@@ -1,6 +1,6 @@
 <script lang="ts">
   import { WEEK_DAYS, emitTaskBlock, parseTaskBlock } from '@markdown-board/core';
-  import type { Day, Priority, Subtask, Task } from '@markdown-board/core';
+  import type { Day, GrammarProfileId, Priority, Subtask, Task } from '@markdown-board/core';
   import { ModalShell } from '@markdown-board/ui';
 
   interface Props {
@@ -8,11 +8,13 @@
     task: Task | null;
     /** Known projects across the vault (drives the `<datalist>`). */
     suggestions: string[];
+    /** Token encoding for the raw markdown tab. Defaults to `default`. */
+    profile?: GrammarProfileId;
     onConfirm: (next: Task) => void;
     onCancel: () => void;
   }
 
-  const { task, suggestions, onConfirm, onCancel }: Props = $props();
+  const { task, suggestions, profile, onConfirm, onCancel }: Props = $props();
 
   // Local form state — initialised on each open from the supplied task.
   // Subtasks are deep-cloned so Cancel can revert without touching the
@@ -50,12 +52,12 @@
     if (next === tab) return;
     if (next === 'raw') {
       // Form → Raw: serialize the current form state into markdown.
-      rawValue = emitTaskBlock(buildTaskFromForm());
+      rawValue = emitTaskBlock(buildTaskFromForm(), { profile });
       rawError = null;
     } else {
       // Raw → Form: parse the raw markdown back into form fields. If
       // parsing fails we surface the error and stay on the raw tab.
-      const parsed = parseTaskBlock(rawValue);
+      const parsed = parseTaskBlock(rawValue, { profile });
       if (!parsed) {
         rawError = 'Couldn’t parse the markdown — expected one `- [ ]` task line.';
         return;
@@ -95,7 +97,7 @@
   }
 
   function buildTaskFromRaw(): Task | null {
-    const parsed = parseTaskBlock(rawValue);
+    const parsed = parseTaskBlock(rawValue, { profile });
     if (!parsed) return null;
     return {
       ...parsed,

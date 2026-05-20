@@ -19,8 +19,15 @@ describe('loadSettings / saveSettings', () => {
   });
 
   it('round-trips through saveSettings', () => {
-    saveSettings({ theme: 'dark', grammarProfile: 'default' });
-    expect(loadSettings()).toEqual({ theme: 'dark', grammarProfile: 'default' });
+    const settings = {
+      theme: 'dark' as const,
+      grammarProfile: 'default' as const,
+      autosaveDelayMs: 750,
+      projectColorOverrides: { PSD_GAN: '#ff0000' },
+      shortcuts: { 'go-board': 'Mod+B' },
+    };
+    saveSettings(settings);
+    expect(loadSettings()).toEqual(settings);
   });
 
   it('falls back to defaults for unknown theme values', () => {
@@ -33,16 +40,54 @@ describe('loadSettings / saveSettings', () => {
     expect(loadSettings().grammarProfile).toBe(DEFAULT_SETTINGS.grammarProfile);
   });
 
+  it('backfills new fields with defaults for legacy stored settings', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ theme: 'dark', grammarProfile: 'default' }));
+    const loaded = loadSettings();
+    expect(loaded.autosaveDelayMs).toBe(DEFAULT_SETTINGS.autosaveDelayMs);
+    expect(loaded.projectColorOverrides).toEqual({});
+    expect(loaded.shortcuts).toEqual({});
+  });
+
+  it('keeps string shortcut overrides, including empty (unbind) values', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ shortcuts: { 'go-list': 'Mod+L', 'command-palette': '', bad: 5 } }),
+    );
+    expect(loadSettings().shortcuts).toEqual({ 'go-list': 'Mod+L', 'command-palette': '' });
+  });
+
+  it('clamps autosaveDelayMs into the allowed range', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ autosaveDelayMs: 99_999 }));
+    expect(loadSettings().autosaveDelayMs).toBe(10_000);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ autosaveDelayMs: 1 }));
+    expect(loadSettings().autosaveDelayMs).toBe(100);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ autosaveDelayMs: 'fast' }));
+    expect(loadSettings().autosaveDelayMs).toBe(DEFAULT_SETTINGS.autosaveDelayMs);
+  });
+
+  it('drops non-string project colour overrides', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ projectColorOverrides: { Good: '#abc', Bad: 42, Empty: '' } }),
+    );
+    expect(loadSettings().projectColorOverrides).toEqual({ Good: '#abc' });
+  });
+
   it('falls back to defaults when localStorage holds invalid JSON', () => {
     localStorage.setItem(STORAGE_KEY, '{not json');
     expect(loadSettings()).toEqual(DEFAULT_SETTINGS);
   });
 
   it('persists under the expected storage key', () => {
-    saveSettings({ theme: 'light', grammarProfile: 'default' });
-    expect(localStorage.getItem(STORAGE_KEY)).toBe(
-      JSON.stringify({ theme: 'light', grammarProfile: 'default' }),
-    );
+    const settings = {
+      theme: 'light' as const,
+      grammarProfile: 'default' as const,
+      autosaveDelayMs: 500,
+      projectColorOverrides: {},
+      shortcuts: {},
+    };
+    saveSettings(settings);
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(JSON.stringify(settings));
   });
 });
 

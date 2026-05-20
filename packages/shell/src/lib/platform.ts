@@ -10,10 +10,17 @@ import type { FileAdapter } from '@markdown-board/core';
 
 /**
  * The adapter the shell needs: the core `FileAdapter` contract plus the
- * `getMtime` extension both platform adapters expose (used by the
- * external-change watcher). Matches `FSAFileAdapter` / `TauriFileAdapter`.
+ * `getMtime` extension (used by the external-change watcher) and the
+ * `readBinary` extension (used by the custom-theme loader to read font /
+ * logo files). Matches `FSAFileAdapter` / `TauriFileAdapter`.
  */
-export type VaultAdapter = FileAdapter & { getMtime(path: string): Promise<number> };
+export type VaultAdapter = FileAdapter & {
+  getMtime(path: string): Promise<number>;
+  /** Read a file as raw bytes (for binary assets like fonts and logos). */
+  readBinary(path: string): Promise<Uint8Array>;
+  /** Human-readable label for the open vault (folder name or absolute path). */
+  readonly displayPath?: string;
+};
 
 /**
  * The reconcile inputs the shell hands a watcher. Mirrors the options both

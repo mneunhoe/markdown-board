@@ -5,7 +5,7 @@
 // against the in-memory adapter in tests and the FSA adapter in the
 // browser without changing.
 
-import type { FileAdapter, LibraryDoc, Vault } from '@markdown-board/core';
+import type { FileAdapter, GrammarProfileId, LibraryDoc, Vault } from '@markdown-board/core';
 import { FileNotFoundError, parseLibrary, parseTasks } from '@markdown-board/core';
 import { ensureUniqueTaskIds } from './mutate.js';
 import { ARCHIVE_PATH } from './resolve.js';
@@ -24,9 +24,12 @@ export interface LoadedVault {
   archive: Vault | null;
 }
 
-export async function loadVault(adapter: FileAdapter): Promise<LoadedVault> {
+export async function loadVault(
+  adapter: FileAdapter,
+  profile?: GrammarProfileId,
+): Promise<LoadedVault> {
   const tasksMd = await readOrEmpty(adapter, 'TASKS.md');
-  const vault = parseTasks(tasksMd);
+  const vault = parseTasks(tasksMd, { profile });
   // Mint missing / colliding ids so DnD reorder handlers can identify
   // tasks unambiguously. The next autosave persists the new ids as
   // `<!-- id:... -->` comments per the §15.1 emitter contract.
@@ -41,7 +44,7 @@ export async function loadVault(adapter: FileAdapter): Promise<LoadedVault> {
     libraryDocs.push(doc);
   }
 
-  const archive = await loadArchive(adapter);
+  const archive = await loadArchive(adapter, profile);
 
   return { vault, libraryDocs, archive };
 }
@@ -53,7 +56,10 @@ export async function loadVault(adapter: FileAdapter): Promise<LoadedVault> {
  * carries the timestamp + the original source-section name; consumers
  * regroup by `sourceSection` at render time (slice 6g-3).
  */
-export async function loadArchive(adapter: FileAdapter): Promise<Vault | null> {
+export async function loadArchive(
+  adapter: FileAdapter,
+  profile?: GrammarProfileId,
+): Promise<Vault | null> {
   let content: string;
   try {
     content = await adapter.readFile(ARCHIVE_PATH);
@@ -61,7 +67,7 @@ export async function loadArchive(adapter: FileAdapter): Promise<Vault | null> {
     if (err instanceof FileNotFoundError) return null;
     throw err;
   }
-  return parseTasks(content);
+  return parseTasks(content, { profile });
 }
 
 async function readOrEmpty(adapter: FileAdapter, path: string): Promise<string> {

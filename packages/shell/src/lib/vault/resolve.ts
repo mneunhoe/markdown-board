@@ -5,7 +5,7 @@
 // to call it *after* the archive write succeeds so a write failure
 // doesn't leave the vault and the archive out of sync.
 
-import type { FileAdapter, Section, Task } from '@markdown-board/core';
+import type { FileAdapter, GrammarProfileId, Section, Task } from '@markdown-board/core';
 import {
   appendToArchive,
   buildArchiveEntry,
@@ -20,6 +20,8 @@ export const ARCHIVE_PATH = 'archive/TASKS.md';
 export interface AppendArchiveEntryOptions {
   /** Injected for deterministic tests. Defaults to `new Date()`. */
   now?: Date;
+  /** Token encoding to write. Defaults to `default`. */
+  profile?: GrammarProfileId | undefined;
 }
 
 /**
@@ -36,12 +38,10 @@ export async function appendArchiveEntry(
   options: AppendArchiveEntryOptions = {},
 ): Promise<void> {
   const existing = await readOrEmpty(adapter, ARCHIVE_PATH);
-  const entry = buildArchiveEntry(
-    task,
-    resolution,
-    section,
-    options.now ? { now: options.now } : {},
-  );
+  const entry = buildArchiveEntry(task, resolution, section, {
+    ...(options.now ? { now: options.now } : {}),
+    ...(options.profile ? { profile: options.profile } : {}),
+  });
   const next = appendToArchive(existing, entry);
   await adapter.writeFile(ARCHIVE_PATH, next);
 }
@@ -134,6 +134,7 @@ export async function unresolveTask(
   adapter: FileAdapter,
   vault: Vault,
   taskId: string,
+  profile?: GrammarProfileId,
 ): Promise<UnresolveTaskResult> {
   let content: string;
   try {
@@ -143,7 +144,7 @@ export async function unresolveTask(
     throw err;
   }
 
-  const { content: nextContent, removed } = removeArchivedTask(content, taskId);
+  const { content: nextContent, removed } = removeArchivedTask(content, taskId, profile);
   if (!removed) return { ok: false, reason: 'not-found' };
 
   if (vault.sections.length === 0) return { ok: false, reason: 'no-active-sections' };
