@@ -153,7 +153,11 @@
   // header); the palette/fonts are injected as CSS by the loader. Status
   // surfaces parse/asset problems to the Settings UI.
   let themeLogoUrl = $state<string | null>(null);
+  let themeTitle = $state<string | null>(null);
   let themeStatus = $state<ThemeStatus>({ state: 'none', errors: [] });
+
+  const DEFAULT_TITLE = 'markdown-board';
+  const brandTitle = $derived(themeTitle ?? DEFAULT_TITLE);
   let vaultPath = $state<string | null>(null);
 
   // Plugin host — holds the reactive registries (commands/views/slots/task
@@ -339,6 +343,7 @@
       const result = await loadVaultTheme(adapter);
       themeStatus = result.status;
       themeLogoUrl = result.logoUrl;
+      themeTitle = result.title;
     } catch (err) {
       themeStatus = { state: 'error', errors: [err instanceof Error ? err.message : String(err)] };
     }
@@ -355,6 +360,7 @@
     themeWatcherDispose = null;
     adapter = null;
     themeLogoUrl = null;
+    themeTitle = null;
     themeStatus = { state: 'none', errors: [] };
     vaultPath = null;
     conflict = null;
@@ -1081,7 +1087,9 @@
       {#if themeLogoUrl}
         <img class="brand-logo" src={themeLogoUrl} alt="" data-testid="brand-logo" />
       {/if}
-      <h1 class="brand-title">markdown-board</h1>
+      {#if brandTitle}
+        <h1 class="brand-title">{brandTitle}</h1>
+      {/if}
     </div>
     <div class="topbar-actions">
       {#if themeStatus.state === 'error'}

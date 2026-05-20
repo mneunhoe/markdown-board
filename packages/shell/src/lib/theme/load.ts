@@ -30,6 +30,8 @@ export interface ThemeLoadResult {
   status: ThemeStatus;
   /** Data URL for the header logo, or `null` when the theme sets none. */
   logoUrl: string | null;
+  /** Header title override, or `null` when the theme sets none. */
+  title: string | null;
 }
 
 function mimeFromExt(path: string): string {
@@ -108,12 +110,13 @@ export async function loadVaultTheme(adapter: VaultAdapter): Promise<ThemeLoadRe
   } catch (err) {
     if (err instanceof FileNotFoundError) {
       injectCss('');
-      return { status: { state: 'none', errors: [] }, logoUrl: null };
+      return { status: { state: 'none', errors: [] }, logoUrl: null, title: null };
     }
     injectCss('');
     return {
       status: { state: 'error', errors: [`Could not read ${THEME_FILE}: ${String(err)}`] },
       logoUrl: null,
+      title: null,
     };
   }
 
@@ -144,7 +147,7 @@ export async function loadVaultTheme(adapter: VaultAdapter): Promise<ThemeLoadRe
   const state: ThemeStatus['state'] = errors.length > 0 ? 'error' : applied ? 'active' : 'none';
   const status: ThemeStatus = { state, errors };
   if (config.name) status.name = config.name;
-  return { status, logoUrl };
+  return { status, logoUrl, title: config.title ?? null };
 }
 
 /**

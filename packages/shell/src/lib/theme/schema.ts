@@ -63,6 +63,8 @@ export interface ThemeConfig {
   name?: string;
   colors?: ThemeColors;
   fonts?: ThemeFonts;
+  /** Header title text. Overrides the default "markdown-board"; "" hides it. */
+  title?: string;
   /** Vault-relative path to a logo image that replaces the header mark. */
   logo?: string;
   /** Dark-mode-only overrides, applied under `[data-theme="dark"]`. */

@@ -138,6 +138,9 @@ export function parseTheme(yamlText: string): ParsedTheme {
   const fonts = parseFonts(doc.fonts, errors);
   if (fonts) config.fonts = fonts;
 
+  if (typeof doc.title === 'string') config.title = doc.title;
+  else if (doc.title !== undefined) errors.push('title must be a string (ignored).');
+
   if (typeof doc.logo === 'string') config.logo = doc.logo;
   else if (doc.logo !== undefined) errors.push('logo must be a string path (ignored).');
 
