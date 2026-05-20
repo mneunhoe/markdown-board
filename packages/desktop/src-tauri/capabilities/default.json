@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "identifier": "default",
-  "description": "Capabilities granted to the main markdown-board window. Slice 2 adds the fs plugin for the TauriFileAdapter; runtime scoping to a specific vault root is the picker's job (lands with the open-vault slice).",
+  "description": "Capabilities granted to the main markdown-board window. Slice 2 adds the fs plugin for the TauriFileAdapter; slice 3 adds watch/unwatch for the native external-change watcher. Runtime scoping to a specific vault root is the picker's job (lands with the open-vault slice).",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -11,6 +11,8 @@
     "fs:allow-read-dir",
     "fs:allow-mkdir",
     "fs:allow-exists",
-    "fs:allow-stat"
+    "fs:allow-stat",
+    "fs:allow-watch",
+    "fs:allow-unwatch"
   ]
 }
