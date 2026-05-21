@@ -58,7 +58,7 @@ describe('LibraryView', () => {
     const { container } = render(LibraryView, {
       docs: [
         makeDoc({
-          sections: { _intro: 'ignored', Background: 'line one\nline two' },
+          sections: { _intro: '', Background: 'line one\nline two' },
         }),
       ],
     });
@@ -71,7 +71,18 @@ describe('LibraryView', () => {
     );
   });
 
-  it('skips _intro and empty sections', () => {
+  it('renders the _intro section (body before the first heading) without a title', () => {
+    const { container } = render(LibraryView, {
+      docs: [makeDoc({ title: 'Test', sections: { _intro: 'Content' } })],
+    });
+    const intro = container.querySelector('[data-testid="library-intro"]');
+    expect(intro).not.toBeNull();
+    expect(intro?.textContent).toContain('Content');
+    // The intro block carries no section heading.
+    expect(container.querySelector('.library-section-title')).toBeNull();
+  });
+
+  it('renders _intro but skips empty named sections', () => {
     const { container } = render(LibraryView, {
       docs: [
         makeDoc({
@@ -83,6 +94,9 @@ describe('LibraryView', () => {
       n.textContent?.trim(),
     );
     expect(titles).toEqual(['Notes']);
+    expect(container.querySelector('[data-testid="library-intro"]')?.textContent).toContain(
+      'has content',
+    );
   });
 
   it('renders parsed tables with headers and rows', () => {

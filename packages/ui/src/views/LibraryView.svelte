@@ -105,6 +105,12 @@
           </dl>
         {/if}
 
+        {#if doc.sections._intro}
+          <div class="library-section" data-testid="library-intro">
+            <pre class="library-section-content">{@render wikiText(doc.sections._intro)}</pre>
+          </div>
+        {/if}
+
         {#each nonIntroSections(doc) as [name, content] (name)}
           <section class="library-section">
             <h3 class="library-section-title">{name}</h3>
