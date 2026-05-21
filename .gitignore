@@ -31,3 +31,11 @@ coverage/
 # Test artifacts
 playwright-report/
 test-results/
+
+# Example-vault runtime artifacts (written by the app when a vault is opened)
+examples/*/.markdown-board/
+examples/*/archive/
+
+# Internal hand-off notes (kept local; the notes/ index stays tracked)
+notes/*
+!notes/README.md
