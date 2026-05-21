@@ -4,5 +4,6 @@ export * from './tasks.js';
 export * from './migrate.js';
 export * from './library.js';
 export * from './links.js';
+export * from './dashboard.js';
 export * from './archive.js';
 export * from './week.js';

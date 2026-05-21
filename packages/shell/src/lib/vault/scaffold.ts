@@ -25,7 +25,18 @@ const TASKS_MD = `# Tasks
 - [x] **Create this vault** <!-- id:starter05 -->
 `;
 
-const DASHBOARD_MD = `# Dashboard
+const DASHBOARD_MD = `---
+# Customize the Overview tab. 'stats' adds count cards (filter on
+# priority/project/day/section/checked); 'builtins' picks/orders the
+# default cards + breakdowns. Delete this block to use the defaults.
+stats:
+  - label: P0 blockers
+    where: { priority: blocker }
+  - label: This week
+    where: { day: [Mon, Tue, Wed, Thu, Fri] }
+---
+
+# Dashboard
 
 Pinned notes that stay visible in the Overview tab. This file is optional —
 delete it if you don't need it.

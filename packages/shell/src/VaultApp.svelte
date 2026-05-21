@@ -1163,6 +1163,7 @@
       <VaultWorkspace
         vault={loaded.vault}
         libraryDocs={loaded.libraryDocs}
+        dashboard={loaded.dashboard}
         {onTaskMove}
         {onColumnMove}
         {onResolve}

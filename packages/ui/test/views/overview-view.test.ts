@@ -1,7 +1,7 @@
 import { render } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 import OverviewView from '../../src/views/OverviewView.svelte';
-import type { LibraryDoc, Section, Task, Vault } from '@markdown-board/core';
+import type { LibraryDoc, ParsedDashboard, Section, Task, Vault } from '@markdown-board/core';
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -180,5 +180,75 @@ describe('OverviewView', () => {
     });
     expect(statValue(container, 'library')).toBe('3');
     expect(statValue(container, 'tasks')).toBe('1');
+  });
+
+  describe('DASHBOARD.md', () => {
+    function dash(overrides: Partial<ParsedDashboard> = {}): ParsedDashboard {
+      return { body: '', config: {}, errors: [], ...overrides };
+    }
+
+    it('renders the DASHBOARD.md body as pinned notes', () => {
+      const vault = makeVault([makeSection('a', 'Active', [makeTask()])]);
+      const { container } = render(OverviewView, {
+        vault,
+        dashboard: dash({ body: '# Dashboard\n\n## Today\nremember the milk' }),
+      });
+      const notes = container.querySelector('[data-testid="pinned-notes"]');
+      expect(notes).not.toBeNull();
+      expect(notes?.textContent).toContain('remember the milk');
+    });
+
+    it('renders a custom stat card with the matching task count', () => {
+      const vault = makeVault([
+        makeSection('a', 'Active', [
+          makeTask({ id: '1', priority: 'blocker' }),
+          makeTask({ id: '2', priority: 'blocker' }),
+          makeTask({ id: '3', priority: 'high' }),
+        ]),
+      ]);
+      const { container } = render(OverviewView, {
+        vault,
+        dashboard: dash({
+          config: { stats: [{ label: 'Blockers', where: { priority: 'blocker' } }] },
+        }),
+      });
+      expect(statValue(container, 'Blockers')).toBe('2');
+    });
+
+    it('filters and orders built-in cards via builtins.cards', () => {
+      const vault = makeVault([makeSection('a', 'Active', [makeTask()])]);
+      const { container } = render(OverviewView, {
+        vault,
+        dashboard: dash({ config: { builtins: { cards: ['open'] } } }),
+      });
+      const labels = [...container.querySelectorAll('.stats .stat-label')].map((n) =>
+        n.textContent?.trim(),
+      );
+      expect(labels).toEqual(['open']);
+    });
+
+    it('filters breakdowns via builtins.breakdowns', () => {
+      const vault = makeVault([
+        makeSection('a', 'Active', [makeTask({ id: '1', priority: 'high', day: 'Mon' })]),
+      ]);
+      const { container } = render(OverviewView, {
+        vault,
+        dashboard: dash({ config: { builtins: { breakdowns: ['day'] } } }),
+      });
+      const headings = [...container.querySelectorAll('.breakdown h3')].map((n) =>
+        n.textContent?.trim(),
+      );
+      expect(headings).toEqual(['By day']);
+    });
+
+    it('shows an error banner when the config has problems', () => {
+      const { container } = render(OverviewView, {
+        vault: makeVault([]),
+        dashboard: dash({
+          errors: ['builtins.cards may only contain: total, open, checked, library.'],
+        }),
+      });
+      expect(container.querySelector('[data-testid="dashboard-errors"]')).not.toBeNull();
+    });
   });
 });

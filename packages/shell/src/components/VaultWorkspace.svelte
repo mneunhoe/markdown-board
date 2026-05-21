@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { LibraryDoc, Vault } from '@markdown-board/core';
+  import type { LibraryDoc, ParsedDashboard, Vault } from '@markdown-board/core';
   import {
     BoardView,
     LibraryView,
@@ -34,6 +34,8 @@
   interface Props {
     vault: Vault;
     libraryDocs: LibraryDoc[];
+    /** Parsed DASHBOARD.md — pinned notes + Overview stats config. */
+    dashboard?: ParsedDashboard;
     /** Wired by App.svelte when a writable vault is open. Omitted ⇒ DnD off. */
     onTaskMove?: TaskMoveHandler;
     onColumnMove?: ColumnMoveHandler;
@@ -77,6 +79,7 @@
   const {
     vault,
     libraryDocs,
+    dashboard,
     onTaskMove,
     onColumnMove,
     onResolve,
@@ -212,7 +215,7 @@
     {:else if active === 'library'}
       <LibraryView docs={libraryDocs} {...onLibraryEdit ? { onEdit: onLibraryEdit } : {}} />
     {:else if active === 'overview'}
-      <OverviewView {vault} {libraryDocs} />
+      <OverviewView {vault} {libraryDocs} {...dashboard ? { dashboard } : {}} />
     {:else if activePluginView}
       <SlotRenderer component={activePluginView.component} />
     {/if}

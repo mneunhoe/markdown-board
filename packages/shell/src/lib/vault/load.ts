@@ -5,8 +5,15 @@
 // against the in-memory adapter in tests and the FSA adapter in the
 // browser without changing.
 
-import type { FileAdapter, GrammarProfileId, LibraryDoc, Vault } from '@markdown-board/core';
+import type {
+  FileAdapter,
+  GrammarProfileId,
+  LibraryDoc,
+  ParsedDashboard,
+  Vault,
+} from '@markdown-board/core';
 import { FileNotFoundError, parseLibrary, parseTasks } from '@markdown-board/core';
+import { parseDashboard } from './dashboard.js';
 import { ensureUniqueTaskIds } from './mutate.js';
 import { ARCHIVE_PATH } from './resolve.js';
 
@@ -22,6 +29,8 @@ export interface LoadedVault {
    * empty state for an empty-but-present archive).
    */
   archive: Vault | null;
+  /** Parsed `DASHBOARD.md` — pinned-notes body + Overview stats config. */
+  dashboard: ParsedDashboard;
 }
 
 export async function loadVault(
@@ -30,6 +39,7 @@ export async function loadVault(
 ): Promise<LoadedVault> {
   const tasksMd = await readOrEmpty(adapter, 'TASKS.md');
   const vault = parseTasks(tasksMd, { profile });
+  const dashboard = parseDashboard(await readOrEmpty(adapter, 'DASHBOARD.md'));
   // Mint missing / colliding ids so DnD reorder handlers can identify
   // tasks unambiguously. The next autosave persists the new ids as
   // `<!-- id:... -->` comments per the §15.1 emitter contract.
@@ -46,7 +56,7 @@ export async function loadVault(
 
   const archive = await loadArchive(adapter, profile);
 
-  return { vault, libraryDocs, archive };
+  return { vault, libraryDocs, archive, dashboard };
 }
 
 /**

@@ -116,6 +116,22 @@ describe('loadVault', () => {
     expect(archive?.sections[0]?.tasks[0]?.title).toBe('Ship');
     expect(archive?.sections[0]?.tasks[0]?.checked).toBe(true);
   });
+
+  it('parses DASHBOARD.md into body + config (empty when missing)', async () => {
+    const empty = await loadVault(new InMemoryAdapter({ 'TASKS.md': '## Active\n' }));
+    expect(empty.dashboard).toEqual({ body: '', config: {}, errors: [] });
+
+    const adapter = new InMemoryAdapter({
+      'TASKS.md': '## Active\n',
+      'DASHBOARD.md':
+        '---\nstats:\n  - label: Blockers\n    where: { priority: blocker }\n---\n\n# Dashboard\nnotes',
+    });
+    const { dashboard } = await loadVault(adapter);
+    expect(dashboard.body).toBe('# Dashboard\nnotes');
+    expect(dashboard.config.stats).toEqual([
+      { label: 'Blockers', where: { priority: ['blocker'] } },
+    ]);
+  });
 });
 
 describe('loadArchive', () => {
