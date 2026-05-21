@@ -16,7 +16,14 @@ export interface SerializeOptions {
 const H2_RE = /^## \*{0,2}(.+?)\*{0,2}$/;
 const TASK_LINE_RE = /^- \[([ xX])\]\s*(.*)$/;
 const SUBTASK_LINE_RE = /^\s+- \[([ xX])\]\s*(.*)$/;
-const ID_SUFFIX_RE = /\s*<!--\s*id:\s*([0-9a-f]+)\s*-->\s*$/i;
+// The task id is persisted as an `<!-- id:… -->` HTML comment. Canonically it
+// sits at the end of the line, but accept any id token (not just hex) found
+// anywhere on the line so a hand-authored or tool-written comment is still
+// recognised — and, crucially, stripped from the rendered title/note instead
+// of leaking into the card. `ID_COMMENT_RE` captures the first id; the global
+// variant removes every occurrence.
+const ID_COMMENT_RE = /\s*<!--\s*id:\s*(\S+?)\s*-->\s*/i;
+const ID_COMMENT_RE_G = /\s*<!--\s*id:\s*\S+?\s*-->\s*/gi;
 const BOLD_WRAP_RE = /^\*\*(.+?)\*\*(.*)$/;
 
 const PROJECT_RE = /^\s*\[\s*project:\s*([^\]]+?)\s*\]\s+(.+)$/i;
@@ -125,10 +132,10 @@ function parseTaskBody(body: string, checked: boolean, profile: GrammarProfile):
   let working = body;
   let id = '';
 
-  const idMatch = ID_SUFFIX_RE.exec(working);
+  const idMatch = ID_COMMENT_RE.exec(working);
   if (idMatch) {
     id = idMatch[1]!;
-    working = working.slice(0, idMatch.index).trimEnd();
+    working = working.replace(ID_COMMENT_RE_G, ' ').trim();
   }
 
   let titleRaw: string;

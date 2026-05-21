@@ -629,3 +629,47 @@ describe('[res: …] marker — parser + emitter (slice 6h)', () => {
     expect(out).toMatch(/- \[ \] \*\*T\*\*\n/);
   });
 });
+
+describe('parseTasks — id comment peeling', () => {
+  function firstTask(taskLine: string): Task {
+    const task = parseTasks(`## Active\n${taskLine}\n`).sections[0]?.tasks[0];
+    if (!task) throw new Error('expected a task');
+    return task;
+  }
+
+  it('peels a non-hex id and keeps the title/note clean', () => {
+    const t = firstTask('- [ ] **Title** - note <!-- id:neon0001 -->');
+    expect(t.id).toBe('neon0001');
+    expect(t.title).toBe('Title');
+    expect(t.note).toBe('note');
+  });
+
+  it('peels an id comment placed inside the bold title', () => {
+    const t = firstTask('- [ ] **Title <!-- id:abc -->**');
+    expect(t.id).toBe('abc');
+    expect(t.title).toBe('Title');
+  });
+
+  it('peels an id comment that is not at the end of the line', () => {
+    const t = firstTask('- [ ] **Title** <!-- id:xyz789 --> trailing');
+    expect(t.id).toBe('xyz789');
+    expect(t.title).toBe('Title');
+    expect(t.note).toBe('trailing');
+    expect(t.title).not.toContain('<!--');
+    expect(t.note).not.toContain('<!--');
+  });
+
+  it('re-emits the id at the canonical end position (round-trip)', () => {
+    const md = '## Active\n- [ ] **Do it <!-- id:neon0001 -->**\n';
+    const out = toMarkdown(parseTasks(md));
+    expect(out).toContain('**Do it** <!-- id:neon0001 -->');
+    expect(toMarkdown(parseTasks(out))).toBe(out);
+  });
+
+  it('leaves non-id HTML comments untouched', () => {
+    const t = firstTask('- [ ] **Title** <!-- keep me --> <!-- id:00000000 -->');
+    expect(t.id).toBe('00000000');
+    expect(t.title).toBe('Title');
+    expect(t.note).toContain('keep me');
+  });
+});
