@@ -1,0 +1,35 @@
+# Neon / synthwave theme for markdown-board — a deliberately loud palette
+# showing how far theme.yaml can push the look. Pure colours + a font stack;
+# no bundled font/logo files so the vault is self-contained.
+name: Neon
+
+title: Neon Board
+
+colors:
+  accent: '#ff2e9a' # hot neon pink
+  accentHover: '#e01b82'
+  background: '#fff0fb' # pale bubblegum
+  surface: '#ffe3f6'
+  card: '#ffffff'
+  text: '#2b0a3d' # deep grape
+  textSecondary: '#7a3b8f'
+  textMuted: '#b07cc6'
+  border: '#ffc6ef'
+  borderLight: '#ffe0f7'
+
+dark:
+  colors:
+    background: '#190b2e' # midnight purple
+    surface: '#241043'
+    card: '#2d1556'
+    text: '#f7e1ff'
+    textSecondary: '#c9a4ff'
+    textMuted: '#8a6db0'
+    accent: '#00f0ff' # neon cyan pops on dark
+    accentHover: '#00c8d6'
+    border: '#3a1d63'
+    borderLight: '#2d1556'
+
+fonts:
+  body: "'Trebuchet MS', 'Segoe UI', system-ui, sans-serif"
+  mono: "'Courier New', ui-monospace, monospace"
